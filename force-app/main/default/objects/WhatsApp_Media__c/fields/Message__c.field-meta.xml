@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Message__c</fullName>
+    <description>Related WhatsApp Message</description>
+    <externalId>false</externalId>
+    <label>Message</label>
+    <referenceTo>WhatsApp_Message__c</referenceTo>
+    <relationshipLabel>Media Files</relationshipLabel>
+    <relationshipName>WhatsApp_Media</relationshipName>
+    <trackTrending>false</trackTrending>
+    <type>MasterDetail</type>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>

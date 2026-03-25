@@ -1,0 +1,35 @@
+# List files or directories below to ignore them when running force:source:push, force:source:pull, and force:source:status
+# More information: https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_exclude_source.htm
+
+package.xml
+
+# LWC configuration files
+**/jsconfig.json
+**/.eslintrc.json
+
+# LWC Jest
+**/__tests__/**
+
+# Standard objects
+**/standardValueSets/**
+**/standardValueSetTranslations/**
+
+# Profiles and Permission Sets (if not needed)
+# **/profiles/**
+
+# Translations
+**/objectTranslations/**
+**/translations/**
+
+# Reports and Dashboards (if not needed)
+# **/reports/**
+# **/dashboards/**
+
+# Documents
+**/documents/**
+
+# Email templates
+# **/email/**
+
+# Static resources
+# **/staticresources/**

@@ -1,0 +1,16 @@
+{
+  "orgName": "WhatsApp SF Scratch Org",
+  "edition": "Developer",
+  "features": ["EnableSetPasswordInApi", "EinsteinAgentEnabled"],
+  "settings": {
+    "lightningExperienceSettings": {
+      "enableS1DesktopEnabled": true
+    },
+    "mobileSettings": {
+      "enableS1EncryptedStoragePref2": false
+    },
+    "securitySettings": {
+      "enableAdminLoginAsAnyUser": true
+    }
+  }
+}
