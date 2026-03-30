@@ -1,17 +1,56 @@
 /**
- * @description Handler for WhatsApp media operations
- * Downloads media from WhatsApp and stores in Salesforce Files
+ * @description Handler for WhatsApp media operations.
+ *              Creates media records, downloads media from WhatsApp and stores
+ *              in Salesforce Files, and uploads local files to WhatsApp.
+ *              All methods are synchronous (no @future) to allow flexible
+ *              invocation from Queueable, Batch, or Platform Event triggers.
  */
 public with sharing class WhatsAppMediaHandler {
 
     /**
-     * @description Download media asynchronously
-     * @param mediaRecordId WhatsApp_Media__c record ID
+     * @description Creates a WhatsApp_Media__c record with Download_Status = Pending.
+     * @param messageId  The parent WhatsApp_Message__c record Id
+     * @param mediaId    The WhatsApp media ID
+     * @param mediaType  The media type (image, video, audio, document, sticker)
+     * @param mimeType   The MIME type string
+     * @param fileName   The original file name (may be null)
+     * @param caption    Optional caption text
+     * @param sha256Hash Optional SHA-256 hash from WhatsApp
+     * @return The inserted WhatsApp_Media__c record
      */
-    @future(callout=true)
-    public static void downloadMediaAsync(String mediaRecordId) {
+    public static WhatsApp_Media__c createMediaRecord(
+        Id messageId,
+        String mediaId,
+        String mediaType,
+        String mimeType,
+        String fileName,
+        String caption,
+        String sha256Hash
+    ) {
+        WhatsApp_Media__c media = new WhatsApp_Media__c(
+            Message__c = messageId,
+            Media_ID__c = mediaId,
+            Media_Type__c = mediaType,
+            MIME_Type__c = mimeType,
+            File_Name__c = fileName,
+            SHA256_Hash__c = sha256Hash,
+            Download_Status__c = WhatsAppConstants.DOWNLOAD_PENDING
+        );
+        insert media;
+        return media;
+    }
+
+    /**
+     * @description Downloads media from WhatsApp servers and stores it as a
+     *              Salesforce ContentVersion/File linked to the parent message.
+     *              Updates the media record with file metadata on success or
+     *              marks it as Failed on error.
+     * @param mediaRecordId The WhatsApp_Media__c record Id
+     */
+    public static void downloadAndStoreMedia(Id mediaRecordId) {
+        WhatsApp_Media__c media;
         try {
-            WhatsApp_Media__c media = [
+            media = [
                 SELECT Id, Media_ID__c, Media_Type__c, File_Name__c,
                        MIME_Type__c, Download_Status__c, Message__c
                 FROM WhatsApp_Media__c
@@ -19,61 +58,159 @@ public with sharing class WhatsAppMediaHandler {
                 LIMIT 1
             ];
 
-            if (media.Download_Status__c == 'Completed') {
+            // Skip if already downloaded
+            if (media.Download_Status__c == WhatsAppConstants.DOWNLOAD_COMPLETED) {
                 return;
             }
 
-            // Update status to downloading
-            media.Download_Status__c = 'Downloading';
+            // Mark as downloading
+            media.Download_Status__c = WhatsAppConstants.DOWNLOAD_DOWNLOADING;
             update media;
 
-            // Download from WhatsApp
+            // Download the binary content from WhatsApp
             Blob fileContent = WhatsAppAPIService.downloadMedia(media.Media_ID__c);
 
-            // Store in Salesforce Files
-            String fileName = media.File_Name__c != null ? media.File_Name__c : 'media_' + media.Media_ID__c;
+            // Determine file name
+            String fileName = String.isNotBlank(media.File_Name__c)
+                ? media.File_Name__c
+                : 'media_' + media.Media_ID__c;
 
+            // Store as Salesforce ContentVersion
             ContentVersion cv = new ContentVersion();
             cv.Title = fileName;
             cv.PathOnClient = fileName;
             cv.VersionData = fileContent;
-            cv.FirstPublishLocationId = media.Message__c;
             insert cv;
 
-            // Update media record
+            // Query to get the auto-created ContentDocumentId
+            cv = [
+                SELECT Id, ContentDocumentId
+                FROM ContentVersion
+                WHERE Id = :cv.Id
+                LIMIT 1
+            ];
+
+            // Link the file to the parent message record
+            ContentDocumentLink cdl = new ContentDocumentLink();
+            cdl.ContentDocumentId = cv.ContentDocumentId;
+            cdl.LinkedEntityId = media.Message__c;
+            cdl.ShareType = 'V';
+            cdl.Visibility = 'AllUsers';
+            insert cdl;
+
+            // Update media record with file references
             media.ContentVersion_ID__c = cv.Id;
+            media.ContentDocumentId__c = cv.ContentDocumentId;
             media.File_Size__c = fileContent.size();
-            media.Download_Status__c = 'Completed';
+            media.Download_Status__c = WhatsAppConstants.DOWNLOAD_COMPLETED;
             update media;
 
         } catch (Exception e) {
-            System.debug('Error downloading media: ' + e.getMessage());
-            updateMediaStatus(mediaRecordId, 'Failed');
+            // Mark as failed and log the error
+            if (mediaRecordId != null) {
+                try {
+                    WhatsApp_Media__c failedMedia = new WhatsApp_Media__c(
+                        Id = mediaRecordId,
+                        Download_Status__c = WhatsAppConstants.DOWNLOAD_FAILED
+                    );
+                    update failedMedia;
+                } catch (Exception updateEx) {
+                    System.debug('Failed to update media status to Failed: ' + updateEx.getMessage());
+                }
+            }
+
+            Id relatedMessageId = (media != null) ? media.Message__c : null;
+            WhatsAppErrorLogger.logMediaError('Error downloading media', relatedMessageId, e);
         }
     }
 
     /**
-     * @description Update media download status
+     * @description Uploads a Salesforce file to WhatsApp and returns the
+     *              WhatsApp media ID. Uses hex-encoding approach to correctly
+     *              build a multipart/form-data request with binary data in Apex.
+     * @param contentVersionId The Salesforce ContentVersion Id
+     * @param conversationId   The WhatsApp_Conversation__c Id (for context)
+     * @param recipientPhone   The recipient phone number
+     * @return The WhatsApp media ID returned by the API
      */
-    private static void updateMediaStatus(String mediaRecordId, String status) {
+    public static String uploadMediaToWhatsApp(Id contentVersionId, String conversationId, String recipientPhone) {
         try {
-            WhatsApp_Media__c media = new WhatsApp_Media__c(
-                Id = mediaRecordId,
-                Download_Status__c = status
-            );
-            update media;
+            WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
+
+            // Get file content from Salesforce
+            ContentVersion cv = [
+                SELECT Id, VersionData, Title, FileType, ContentSize, FileExtension
+                FROM ContentVersion
+                WHERE Id = :contentVersionId
+                LIMIT 1
+            ];
+
+            String endpoint = WhatsAppConfigService.getMediaEndpoint();
+            String mimeType = getMimeType(cv.FileType);
+            String fileName = cv.Title;
+
+            // Build multipart/form-data using hex encoding for correct binary handling
+            String boundary = '----FormBoundary' + String.valueOf(DateTime.now().getTime());
+
+            // Part 1: messaging_product field
+            String productPart = '--' + boundary + '\r\n'
+                + 'Content-Disposition: form-data; name="messaging_product"\r\n\r\n'
+                + WhatsAppConstants.MESSAGE_PRODUCT + '\r\n';
+
+            // Part 2: type field
+            String mediaType = determineMediaType(cv.FileType);
+            String typePart = '--' + boundary + '\r\n'
+                + 'Content-Disposition: form-data; name="type"\r\n\r\n'
+                + mimeType + '\r\n';
+
+            // Part 3: file data header
+            String fileHeader = '--' + boundary + '\r\n'
+                + 'Content-Disposition: form-data; name="file"; filename="' + fileName + '"\r\n'
+                + 'Content-Type: ' + mimeType + '\r\n\r\n';
+
+            // Part 4: closing boundary
+            String fileFooter = '\r\n--' + boundary + '--';
+
+            // Convert each part to hex and concatenate to preserve binary fidelity
+            String headerHex = EncodingUtil.convertToHex(Blob.valueOf(productPart + typePart + fileHeader));
+            String bodyHex = EncodingUtil.convertToHex(cv.VersionData);
+            String footerHex = EncodingUtil.convertToHex(Blob.valueOf(fileFooter));
+
+            Blob requestBlob = EncodingUtil.convertFromHex(headerHex + bodyHex + footerHex);
+
+            HttpRequest req = new HttpRequest();
+            req.setEndpoint(endpoint);
+            req.setMethod('POST');
+            req.setHeader('Authorization', 'Bearer ' + config.API_Key__c);
+            req.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
+            req.setBodyAsBlob(requestBlob);
+            req.setTimeout(WhatsAppConstants.DEFAULT_TIMEOUT);
+
+            Http http = new Http();
+            HttpResponse res = http.send(req);
+
+            if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
+                Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+                String whatsAppMediaId = (String) responseMap.get('id');
+                return whatsAppMediaId;
+            } else {
+                throw new WhatsAppAPIService.WhatsAppException(
+                    'Failed to upload media: HTTP ' + res.getStatusCode() + ' - ' + res.getBody()
+                );
+            }
         } catch (Exception e) {
-            System.debug('Error updating media status: ' + e.getMessage());
+            WhatsAppErrorLogger.logMediaError('Error uploading media to WhatsApp', null, e);
+            throw new WhatsAppAPIService.WhatsAppException('Error uploading media: ' + e.getMessage());
         }
     }
 
     /**
-     * @description Get media preview URL
-     * @param mediaRecordId WhatsApp_Media__c record ID
-     * @return String Preview URL
+     * @description Returns a Salesforce download URL for the media file.
+     * @param mediaRecordId The WhatsApp_Media__c record Id
+     * @return The ContentVersion download URL, or null if not available
      */
     @AuraEnabled(cacheable=true)
-    public static String getMediaPreviewUrl(String mediaRecordId) {
+    public static String getMediaPreviewUrl(Id mediaRecordId) {
         try {
             WhatsApp_Media__c media = [
                 SELECT Id, ContentVersion_ID__c
@@ -89,7 +226,6 @@ public with sharing class WhatsAppMediaHandler {
                     WHERE Id = :media.ContentVersion_ID__c
                     LIMIT 1
                 ];
-
                 return '/sfc/servlet.shepherd/version/download/' + cv.Id;
             }
 
@@ -100,107 +236,84 @@ public with sharing class WhatsAppMediaHandler {
     }
 
     /**
-     * @description Upload media to WhatsApp for sending
-     * @param contentVersionId Salesforce ContentVersion ID
-     * @return String WhatsApp media ID
-     */
-    @future(callout=true)
-    public static void uploadMediaToWhatsApp(String contentVersionId, String conversationId) {
-        try {
-            WhatsApp_Configuration__c config = WhatsAppAPIService.getActiveConfiguration();
-
-            // Get file content
-            ContentVersion cv = [
-                SELECT Id, VersionData, Title, FileType, ContentSize
-                FROM ContentVersion
-                WHERE Id = :contentVersionId
-                LIMIT 1
-            ];
-
-            String endpoint = config.API_Base_URL__c + '/' + config.Phone_Number__c + '/media';
-
-            HttpRequest req = new HttpRequest();
-            req.setEndpoint(endpoint);
-            req.setMethod('POST');
-            req.setHeader('Authorization', 'Bearer ' + config.API_Key__c);
-
-            // Create multipart form data
-            String boundary = '----WebKitFormBoundary' + String.valueOf(DateTime.now().getTime());
-            req.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
-
-            String bodyStart = '--' + boundary + '\r\n' +
-                              'Content-Disposition: form-data; name="file"; filename="' + cv.Title + '"\r\n' +
-                              'Content-Type: ' + getMimeType(cv.FileType) + '\r\n\r\n';
-
-            String bodyEnd = '\r\n--' + boundary + '--';
-
-            Blob bodyBlob = Blob.valueOf(bodyStart);
-            bodyBlob = Blob.valueOf(EncodingUtil.base64Encode(bodyBlob) +
-                                   EncodingUtil.base64Encode(cv.VersionData) +
-                                   EncodingUtil.base64Encode(Blob.valueOf(bodyEnd)));
-
-            req.setBodyAsBlob(bodyBlob);
-            req.setTimeout(60000);
-
-            Http http = new Http();
-            HttpResponse res = http.send(req);
-
-            if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
-                Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-                String mediaId = (String) responseMap.get('id');
-
-                // Now send the media message
-                WhatsApp_Conversation__c conv = [
-                    SELECT Id, Customer_Phone__c
-                    FROM WhatsApp_Conversation__c
-                    WHERE Id = :conversationId
-                    LIMIT 1
-                ];
-
-                String mediaType = determineMediaType(cv.FileType);
-                WhatsAppAPIService.sendMediaMessage(conv.Customer_Phone__c, mediaId, mediaType, cv.Title, conversationId);
-            } else {
-                throw new WhatsAppAPIService.WhatsAppException('Failed to upload media: ' + res.getBody());
-            }
-        } catch (Exception e) {
-            System.debug('Error uploading media to WhatsApp: ' + e.getMessage());
-        }
-    }
-
-    /**
-     * @description Get MIME type from file extension
+     * @description Maps file extensions to MIME types, including WhatsApp-specific formats.
+     * @param fileType The file extension (e.g., 'jpg', 'webp', 'ogg')
+     * @return The corresponding MIME type string
      */
     private static String getMimeType(String fileType) {
+        if (String.isBlank(fileType)) {
+            return 'application/octet-stream';
+        }
+
         Map<String, String> mimeTypes = new Map<String, String>{
-            'jpg' => 'image/jpeg',
+            // Images
+            'jpg'  => 'image/jpeg',
             'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'mp4' => 'video/mp4',
-            'mp3' => 'audio/mpeg',
-            'pdf' => 'application/pdf',
-            'doc' => 'application/msword',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            'png'  => 'image/png',
+            'gif'  => 'image/gif',
+            'webp' => 'image/webp',
+            'bmp'  => 'image/bmp',
+            'svg'  => 'image/svg+xml',
+            // Video
+            'mp4'  => 'video/mp4',
+            'avi'  => 'video/x-msvideo',
+            '3gp'  => 'video/3gpp',
+            'mkv'  => 'video/x-matroska',
+            'mov'  => 'video/quicktime',
+            // Audio
+            'mp3'  => 'audio/mpeg',
+            'ogg'  => 'audio/ogg',
+            'amr'  => 'audio/amr',
+            'opus' => 'audio/opus',
+            'aac'  => 'audio/aac',
+            'wav'  => 'audio/wav',
+            'm4a'  => 'audio/mp4',
+            // Documents
+            'pdf'  => 'application/pdf',
+            'doc'  => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls'  => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt'  => 'application/vnd.ms-powerpoint',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'txt'  => 'text/plain',
+            'csv'  => 'text/csv',
+            'zip'  => 'application/zip',
+            'json' => 'application/json',
+            'xml'  => 'application/xml'
         };
 
-        return mimeTypes.get(fileType.toLowerCase()) != null ?
-               mimeTypes.get(fileType.toLowerCase()) : 'application/octet-stream';
+        String key = fileType.toLowerCase();
+        return mimeTypes.containsKey(key) ? mimeTypes.get(key) : 'application/octet-stream';
     }
 
     /**
-     * @description Determine media type for WhatsApp
+     * @description Determines the WhatsApp media category from a file extension.
+     * @param fileType The file extension
+     * @return One of: image, video, audio, document, sticker
      */
     private static String determineMediaType(String fileType) {
+        if (String.isBlank(fileType)) {
+            return WhatsAppConstants.MEDIA_DOCUMENT;
+        }
+
         fileType = fileType.toLowerCase();
 
-        if (fileType == 'jpg' || fileType == 'jpeg' || fileType == 'png' || fileType == 'gif') {
-            return 'image';
-        } else if (fileType == 'mp4' || fileType == 'avi') {
-            return 'video';
-        } else if (fileType == 'mp3' || fileType == 'ogg' || fileType == 'amr') {
-            return 'audio';
+        Set<String> imageTypes = new Set<String>{ 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg' };
+        Set<String> videoTypes = new Set<String>{ 'mp4', 'avi', '3gp', 'mkv', 'mov' };
+        Set<String> audioTypes = new Set<String>{ 'mp3', 'ogg', 'amr', 'opus', 'aac', 'wav', 'm4a' };
+        Set<String> stickerTypes = new Set<String>{ 'webp' };
+
+        if (imageTypes.contains(fileType)) {
+            return WhatsAppConstants.MEDIA_IMAGE;
+        } else if (videoTypes.contains(fileType)) {
+            return WhatsAppConstants.MEDIA_VIDEO;
+        } else if (audioTypes.contains(fileType)) {
+            return WhatsAppConstants.MEDIA_AUDIO;
+        } else if (stickerTypes.contains(fileType)) {
+            return WhatsAppConstants.MEDIA_STICKER;
         } else {
-            return 'document';
+            return WhatsAppConstants.MEDIA_DOCUMENT;
         }
     }
 }

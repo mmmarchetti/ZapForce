@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Send a location pin via WhatsApp. Requires the recipient phone number, latitude, and longitude. Optionally includes a location name, address, and conversation ID.</description>
+    <invocationTarget>WhatsAppSendLocationAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Send WhatsApp Location</masterLabel>
+</GenAiFunction>

@@ -47,6 +47,36 @@
                 <default>false</default>
                 <label>Contact</label>
             </value>
+            <value>
+                <fullName>Sticker</fullName>
+                <default>false</default>
+                <label>Sticker</label>
+            </value>
+            <value>
+                <fullName>Interactive</fullName>
+                <default>false</default>
+                <label>Interactive</label>
+            </value>
+            <value>
+                <fullName>Template</fullName>
+                <default>false</default>
+                <label>Template</label>
+            </value>
+            <value>
+                <fullName>Reaction</fullName>
+                <default>false</default>
+                <label>Reaction</label>
+            </value>
+            <value>
+                <fullName>Contacts</fullName>
+                <default>false</default>
+                <label>Contacts</label>
+            </value>
+            <value>
+                <fullName>System</fullName>
+                <default>false</default>
+                <label>System</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

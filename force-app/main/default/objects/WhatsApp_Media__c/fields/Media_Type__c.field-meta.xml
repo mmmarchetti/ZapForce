@@ -31,6 +31,11 @@
                 <default>false</default>
                 <label>Document</label>
             </value>
+            <value>
+                <fullName>Sticker</fullName>
+                <default>false</default>
+                <label>Sticker</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

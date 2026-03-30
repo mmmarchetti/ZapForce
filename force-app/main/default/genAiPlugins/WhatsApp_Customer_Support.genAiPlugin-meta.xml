@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlugin xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <description>Provides general customer support via WhatsApp. Answers questions, shares information, sends media, locations, and interactive messages to assist customers.</description>
+    <developerName>WhatsApp_Customer_Support</developerName>
+    <genAiFunctions>
+        <functionName>WhatsAppSendTextAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppSendMediaAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppSendLocationAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppSendInteractiveAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppGetCustomerInfoAction</functionName>
+    </genAiFunctions>
+    <genAiPluginInstructions>
+        <description>Help customers with their questions. Use interactive messages for choices. Send location when sharing addresses. Use media for product images.</description>
+        <developerName>instruction_0</developerName>
+        <language xsi:nil="true"/>
+        <masterLabel>instruction_0</masterLabel>
+    </genAiPluginInstructions>
+    <language>en_US</language>
+    <masterLabel>WhatsApp Customer Support</masterLabel>
+    <pluginType>Topic</pluginType>
+    <scope>You provide general customer support via WhatsApp. Answer questions, provide information, and assist with requests.</scope>
+</GenAiPlugin>

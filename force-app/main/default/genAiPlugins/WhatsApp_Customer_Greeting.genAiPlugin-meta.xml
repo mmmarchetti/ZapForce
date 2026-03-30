@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlugin xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <description>Handles initial greetings and welcome messages from WhatsApp customers. Identifies the customer and responds with a personalized greeting.</description>
+    <developerName>WhatsApp_Customer_Greeting</developerName>
+    <genAiFunctions>
+        <functionName>WhatsAppSendTextAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppGetCustomerInfoAction</functionName>
+    </genAiFunctions>
+    <genAiPluginInstructions>
+        <description>When a customer greets you, look up their information first, then respond warmly with their name if available.</description>
+        <developerName>instruction_0</developerName>
+        <language xsi:nil="true"/>
+        <masterLabel>instruction_0</masterLabel>
+    </genAiPluginInstructions>
+    <language>en_US</language>
+    <masterLabel>WhatsApp Customer Greeting</masterLabel>
+    <pluginType>Topic</pluginType>
+    <scope>You handle initial greetings and customer identification. Always look up the customer first.</scope>
+</GenAiPlugin>

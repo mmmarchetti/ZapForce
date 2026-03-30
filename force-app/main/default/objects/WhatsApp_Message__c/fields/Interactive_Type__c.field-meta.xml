@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Interactive_Type__c</fullName>
+    <description>Type of interactive message response</description>
+    <externalId>false</externalId>
+    <label>Interactive Type</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Button_Reply</fullName>
+                <default>false</default>
+                <label>Button_Reply</label>
+            </value>
+            <value>
+                <fullName>List_Reply</fullName>
+                <default>false</default>
+                <label>List_Reply</label>
+            </value>
+            <value>
+                <fullName>CTA_URL</fullName>
+                <default>false</default>
+                <label>CTA_URL</label>
+            </value>
+            <value>
+                <fullName>Flow</fullName>
+                <default>false</default>
+                <label>Flow</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

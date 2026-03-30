@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Look up customer information in Salesforce by phone number. Returns the contact name, email, account name, and count of open cases if the customer is found.</description>
+    <invocationTarget>WhatsAppGetCustomerInfoAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Get WhatsApp Customer Info</masterLabel>
+</GenAiFunction>

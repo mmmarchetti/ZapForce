@@ -1,8 +1,17 @@
 <template>
     <lightning-card title="WhatsApp Conversations" icon-name="standard:live_chat">
         <div class="conversation-container">
-            <!-- Conversations List -->
+            <!-- Left Sidebar: Conversation List -->
             <div class="conversations-sidebar">
+                <div class="sidebar-header slds-p-around_small">
+                    <lightning-input
+                        type="search"
+                        placeholder="Search conversations..."
+                        onchange={handleSearchInput}
+                        variant="label-hidden">
+                    </lightning-input>
+                </div>
+
                 <template if:true={isLoading}>
                     <div class="slds-align_absolute-center slds-m-vertical_large">
                         <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
@@ -10,22 +19,23 @@
                 </template>
 
                 <template if:true={hasConversations}>
-                    <ul class="slds-has-dividers_bottom-space">
+                    <ul class="conversation-list">
                         <template for:each={conversations} for:item="conversation">
-                            <li key={conversation.Id} class="slds-item">
-                                <div class="conversation-item" data-id={conversation.Id} onclick={handleConversationSelect}>
-                                    <div class="slds-grid slds-wrap">
-                                        <div class="slds-col slds-size_1-of-1">
-                                            <div class="slds-text-heading_small">{conversation.Customer_Phone__c}</div>
-                                        </div>
-                                        <div class="slds-col slds-size_1-of-2">
-                                            <lightning-badge label={conversation.Status__c}></lightning-badge>
-                                        </div>
-                                        <div class="slds-col slds-size_1-of-2 slds-text-align_right">
-                                            <div class="slds-text-body_small slds-text-color_weak">
-                                                {conversation.Message_Count__c} messages
-                                            </div>
-                                        </div>
+                            <li key={conversation.Id}>
+                                <div class={conversation.itemClass}
+                                     data-id={conversation.Id}
+                                     onclick={handleConversationSelect}>
+                                    <div class="conv-top-row">
+                                        <span class="conv-name slds-truncate">{conversation.displayName}</span>
+                                        <span class="conv-time slds-text-body_small">{conversation.lastMessageTime}</span>
+                                    </div>
+                                    <div class="conv-bottom-row">
+                                        <lightning-badge label={conversation.Status__c}
+                                                         class={conversation.statusBadgeClass}>
+                                        </lightning-badge>
+                                        <template if:true={conversation.hasUnread}>
+                                            <span class="unread-badge">{conversation.Unread_Count__c}</span>
+                                        </template>
                                     </div>
                                 </div>
                             </li>
@@ -34,78 +44,249 @@
                 </template>
 
                 <template if:false={hasConversations}>
-                    <div class="slds-align_absolute-center slds-m-vertical_large">
-                        <p class="slds-text-color_weak">No conversations found</p>
-                    </div>
+                    <template if:false={isLoading}>
+                        <div class="slds-align_absolute-center slds-m-vertical_large">
+                            <p class="slds-text-color_weak">No conversations found</p>
+                        </div>
+                    </template>
                 </template>
             </div>
 
-            <!-- Messages Panel -->
+            <!-- Right Panel: Messages -->
             <div class="messages-panel">
                 <template if:true={selectedConversation}>
                     <!-- Header -->
                     <div class="messages-header">
-                        <div class="slds-grid slds-grid_align-spread">
+                        <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
                             <div class="slds-col">
                                 <h3 class="slds-text-heading_medium">{conversationTitle}</h3>
-                                <lightning-badge label={selectedConversation.Status__c}></lightning-badge>
+                                <div class="slds-m-top_xx-small">
+                                    <lightning-badge label={selectedConversation.Status__c}></lightning-badge>
+                                    <template if:true={selectedConversation.Customer_Phone__c}>
+                                        <span class="slds-text-body_small slds-m-left_small slds-text-color_weak">
+                                            {selectedConversation.Customer_Phone__c}
+                                        </span>
+                                    </template>
+                                </div>
                             </div>
                             <div class="slds-col slds-text-align_right">
                                 <lightning-button
                                     label="Close Conversation"
                                     onclick={handleCloseConversation}
-                                    variant="destructive-text">
+                                    variant="destructive-text"
+                                    icon-name="utility:close">
                                 </lightning-button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Messages -->
-                    <div class="messages-container">
+                    <!-- Messages Body -->
+                    <div class="messages-body">
+                        <template if:true={isLoading}>
+                            <div class="slds-align_absolute-center slds-m-vertical_large">
+                                <lightning-spinner alternative-text="Loading messages" size="small"></lightning-spinner>
+                            </div>
+                        </template>
+
                         <template if:true={hasMessages}>
                             <template for:each={messages} for:item="message">
-                                <div key={message.Id} class={message.Direction__c}>
-                                    <div class="message-bubble">
-                                        <div class="message-content">{message.Content__c}</div>
-                                        <div class="message-timestamp slds-text-body_small slds-text-color_weak">
-                                            {message.Timestamp__c}
-                                        </div>
-                                        <template if:true={message.Message_Status__c}>
-                                            <div class="message-status slds-text-body_small">
-                                                <lightning-badge label={message.Message_Status__c}></lightning-badge>
+                                <div key={message.Id}>
+                                    <!-- System Message -->
+                                    <template if:true={message.isSystem}>
+                                        <div class="message-row system">
+                                            <div class="system-message">
+                                                {message.Content__c}
+                                                <div class="message-time">{message.formattedTime}</div>
                                             </div>
-                                        </template>
-                                    </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Regular Message -->
+                                    <template if:false={message.isSystem}>
+                                        <div class={message.bubbleClass}>
+                                            <div class="message-bubble">
+                                                <!-- Forwarded Label -->
+                                                <template if:true={message.Is_Forwarded__c}>
+                                                    <div class="forwarded-label">
+                                                        <lightning-icon icon-name="utility:forward" size="xx-small" alternative-text="Forwarded"></lightning-icon>
+                                                        <span class="slds-m-left_xx-small">Forwarded</span>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Agentforce Indicator -->
+                                                <template if:true={message.Is_From_Agentforce__c}>
+                                                    <div class="agentforce-label">
+                                                        <lightning-icon icon-name="utility:einstein" size="xx-small" alternative-text="Agentforce"></lightning-icon>
+                                                        <span class="slds-m-left_xx-small">Agentforce</span>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Text Message -->
+                                                <template if:true={message.isText}>
+                                                    <div class="message-content">{message.Content__c}</div>
+                                                </template>
+
+                                                <!-- Media Message (Image, Video, Audio, Document, Sticker) -->
+                                                <template if:true={message.isMedia}>
+                                                    <div class="media-content">
+                                                        <lightning-icon icon-name={message.mediaIcon} size="small" alternative-text={message.Message_Type__c}></lightning-icon>
+                                                        <span class="media-type-label slds-m-left_x-small">{message.Message_Type__c}</span>
+                                                    </div>
+                                                    <template if:true={message.hasMedia}>
+                                                        <template for:each={message.WhatsApp_Media__r} for:item="media">
+                                                            <div key={media.Id} class="media-item">
+                                                                <span class="media-filename slds-truncate">{media.File_Name__c}</span>
+                                                                <lightning-badge label={media.Download_Status__c}
+                                                                                class="slds-m-left_x-small">
+                                                                </lightning-badge>
+                                                            </div>
+                                                        </template>
+                                                    </template>
+                                                    <template if:true={message.Content__c}>
+                                                        <div class="message-content slds-m-top_xx-small">{message.Content__c}</div>
+                                                    </template>
+                                                </template>
+
+                                                <!-- Location Message -->
+                                                <template if:true={message.isLocation}>
+                                                    <div class="location-content">
+                                                        <lightning-icon icon-name="utility:location" size="small" alternative-text="Location"></lightning-icon>
+                                                        <div class="location-details slds-m-left_x-small">
+                                                            <template if:true={message.Location_Name__c}>
+                                                                <div class="location-name">{message.Location_Name__c}</div>
+                                                            </template>
+                                                            <template if:true={message.Location_Address__c}>
+                                                                <div class="location-address slds-text-body_small">{message.Location_Address__c}</div>
+                                                            </template>
+                                                            <div class="location-coords slds-text-body_small slds-text-color_weak">
+                                                                {message.Latitude__c}, {message.Longitude__c}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Reaction Message -->
+                                                <template if:true={message.isReaction}>
+                                                    <div class="reaction-content">
+                                                        <span class="reaction-emoji">{message.Reaction_Emoji__c}</span>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Interactive Message -->
+                                                <template if:true={message.isInteractive}>
+                                                    <div class="interactive-content">
+                                                        <template if:true={message.Content__c}>
+                                                            <div class="message-content">{message.Content__c}</div>
+                                                        </template>
+                                                        <template if:true={message.Interactive_Button_Text__c}>
+                                                            <div class="interactive-button slds-m-top_xx-small">
+                                                                <lightning-badge label={message.Interactive_Button_Text__c}></lightning-badge>
+                                                                <template if:true={message.Interactive_Type__c}>
+                                                                    <span class="slds-text-body_small slds-text-color_weak slds-m-left_x-small">
+                                                                        ({message.Interactive_Type__c})
+                                                                    </span>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Template Message -->
+                                                <template if:true={message.isTemplate}>
+                                                    <div class="template-content">
+                                                        <div class="template-label">
+                                                            <lightning-icon icon-name="utility:template" size="xx-small" alternative-text="Template"></lightning-icon>
+                                                            <span class="slds-m-left_xx-small slds-text-body_small">Template: {message.Template_Name__c}</span>
+                                                        </div>
+                                                        <template if:true={message.Content__c}>
+                                                            <div class="message-content slds-m-top_xx-small">{message.Content__c}</div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Contacts Message -->
+                                                <template if:true={message.isContacts}>
+                                                    <div class="contacts-content">
+                                                        <lightning-icon icon-name="utility:people" size="small" alternative-text="Contact"></lightning-icon>
+                                                        <span class="slds-m-left_x-small">Contact Card</span>
+                                                        <template if:true={message.Content__c}>
+                                                            <div class="message-content slds-m-top_xx-small">{message.Content__c}</div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Error Info for Failed Messages -->
+                                                <template if:true={message.isFailed}>
+                                                    <div class="error-info slds-m-top_xx-small">
+                                                        <lightning-icon icon-name="utility:error" size="xx-small" variant="error" alternative-text="Error"></lightning-icon>
+                                                        <span class="slds-m-left_xx-small slds-text-color_error slds-text-body_small">
+                                                            {message.Error_Code__c}: {message.Error_Message__c}
+                                                        </span>
+                                                    </div>
+                                                </template>
+
+                                                <!-- Timestamp and Status -->
+                                                <div class="message-footer">
+                                                    <span class="message-time">{message.formattedTime}</span>
+                                                    <template if:true={message.isOutbound}>
+                                                        <span class="message-status slds-m-left_xx-small">{message.Message_Status__c}</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </template>
+
+                        <template if:false={hasMessages}>
+                            <template if:false={isLoading}>
+                                <div class="slds-align_absolute-center slds-m-vertical_large">
+                                    <p class="slds-text-color_weak">No messages in this conversation</p>
                                 </div>
                             </template>
                         </template>
                     </div>
 
                     <!-- Input Area -->
-                    <div class="message-input-container">
-                        <lightning-textarea
-                            value={newMessage}
-                            placeholder="Type a message..."
-                            onchange={handleMessageInput}
-                            onkeypress={handleKeyPress}
-                            disabled={isMessageInputDisabled}>
-                        </lightning-textarea>
-                        <lightning-button
-                            variant="brand"
-                            label="Send"
-                            onclick={handleSendMessage}
-                            disabled={isMessageInputDisabled}
-                            class="slds-m-top_small">
-                        </lightning-button>
+                    <div class="message-input-area">
+                        <div class="slds-grid slds-grid_vertical-align-end">
+                            <div class="slds-col slds-grow">
+                                <lightning-textarea
+                                    value={newMessage}
+                                    placeholder="Type a message..."
+                                    onchange={handleMessageInput}
+                                    onkeypress={handleKeyPress}
+                                    disabled={isInputDisabled}
+                                    variant="label-hidden"
+                                    max-length="4096">
+                                </lightning-textarea>
+                            </div>
+                            <div class="slds-col slds-no-flex slds-m-left_small">
+                                <lightning-button
+                                    variant="brand"
+                                    label="Send"
+                                    icon-name="utility:send"
+                                    onclick={handleSendMessage}
+                                    disabled={isInputDisabled}>
+                                </lightning-button>
+                            </div>
+                        </div>
                         <template if:true={isSending}>
-                            <lightning-spinner alternative-text="Sending" size="small"></lightning-spinner>
+                            <div class="sending-indicator">
+                                <lightning-spinner alternative-text="Sending" size="xx-small"></lightning-spinner>
+                                <span class="slds-m-left_x-small slds-text-body_small">Sending...</span>
+                            </div>
                         </template>
                     </div>
                 </template>
 
                 <template if:false={selectedConversation}>
-                    <div class="slds-align_absolute-center" style="height: 100%;">
-                        <p class="slds-text-color_weak">Select a conversation to view messages</p>
+                    <div class="no-selection">
+                        <lightning-icon icon-name="standard:live_chat" size="large" alternative-text="Chat"></lightning-icon>
+                        <p class="slds-text-heading_small slds-m-top_medium slds-text-color_weak">
+                            Select a conversation to view messages
+                        </p>
                     </div>
                 </template>
             </div>

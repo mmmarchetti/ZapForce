@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Voice_Note__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Whether this audio is a WhatsApp voice note</description>
+    <externalId>false</externalId>
+    <label>Is Voice Note</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

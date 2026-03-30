@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Send a media file (image, video, audio, or document) via WhatsApp. Requires the recipient phone number, media ID, and media type. Optionally includes a caption and conversation ID.</description>
+    <invocationTarget>WhatsAppSendMediaAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Send WhatsApp Media Message</masterLabel>
+</GenAiFunction>

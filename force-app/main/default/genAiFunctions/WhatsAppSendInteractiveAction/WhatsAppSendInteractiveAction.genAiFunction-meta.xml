@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Send an interactive WhatsApp message with buttons or lists. Requires the recipient phone number and an interactive payload as JSON. Optionally associates with a conversation.</description>
+    <invocationTarget>WhatsAppSendInteractiveAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Send WhatsApp Interactive Message</masterLabel>
+</GenAiFunction>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Send a template-based WhatsApp message. Requires the recipient phone number, template name, and language code. Optionally accepts template variables as JSON and a conversation ID.</description>
+    <invocationTarget>WhatsAppSendTemplateAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Send WhatsApp Template Message</masterLabel>
+</GenAiFunction>

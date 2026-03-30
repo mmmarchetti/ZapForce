@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Mark a WhatsApp message as read. Requires the WhatsApp message ID to send a read receipt to the sender.</description>
+    <invocationTarget>WhatsAppMarkReadAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Mark WhatsApp Message as Read</masterLabel>
+</GenAiFunction>

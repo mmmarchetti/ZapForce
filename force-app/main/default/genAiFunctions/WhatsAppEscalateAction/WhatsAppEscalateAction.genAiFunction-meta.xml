@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Escalate a WhatsApp conversation to a human agent by creating a Salesforce case. Requires the conversation ID. Optionally includes a subject, description, and whether to notify the customer.</description>
+    <invocationTarget>WhatsAppEscalateAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Escalate WhatsApp to Human Agent</masterLabel>
+</GenAiFunction>

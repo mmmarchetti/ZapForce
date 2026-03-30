@@ -42,8 +42,7 @@ public with sharing class WhatsAppAgentforceHandler {
             if (String.isNotBlank(agentResponse)) {
                 WhatsAppAPIService.sendTextMessage(
                     message.Conversation__r.Customer_Phone__c,
-                    agentResponse,
-                    conversationId
+                    agentResponse
                 );
             }
 

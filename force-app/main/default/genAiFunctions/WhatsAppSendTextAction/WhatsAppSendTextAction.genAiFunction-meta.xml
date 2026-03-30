@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Send a text message to a WhatsApp recipient. Requires the recipient phone number and message text. Optionally associates the message with an existing conversation.</description>
+    <invocationTarget>WhatsAppSendTextAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Send WhatsApp Text Message</masterLabel>
+</GenAiFunction>

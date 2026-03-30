@@ -1,13 +1,17 @@
 /**
- * @description REST endpoint for receiving WhatsApp webhooks
+ * @description REST endpoint for receiving WhatsApp webhooks.
+ *              Handles verification (GET) and incoming messages/statuses (POST).
+ *              Delegates parsing to WhatsAppWebhookParser, publishes Platform Events
+ *              for inbound messages, and updates statuses via WhatsAppMessageService.
  * URL: /services/apexrest/whatsapp/webhook
  */
 @RestResource(urlMapping='/whatsapp/webhook/*')
 global with sharing class WhatsAppWebhookHandler {
 
     /**
-     * @description Handle webhook verification (GET request)
-     * WhatsApp sends this during initial setup
+     * @description Handle webhook verification (GET request).
+     *              WhatsApp sends this during initial setup to confirm ownership.
+     * @return The hub.challenge value on success, or 'Forbidden' on failure
      */
     @HttpGet
     global static String handleVerification() {
@@ -18,12 +22,16 @@ global with sharing class WhatsAppWebhookHandler {
         String token = req.params.get('hub.verify_token');
         String challenge = req.params.get('hub.challenge');
 
-        if (mode == 'subscribe') {
-            WhatsApp_Configuration__c config = getActiveConfiguration();
+        if (mode == WhatsAppConstants.WEBHOOK_MODE_SUBSCRIBE) {
+            try {
+                WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
 
-            if (config != null && token == config.Webhook_Verify_Token__c) {
-                res.statusCode = 200;
-                return challenge;
+                if (config != null && token == config.Webhook_Verify_Token__c) {
+                    res.statusCode = 200;
+                    return challenge;
+                }
+            } catch (Exception e) {
+                // No active config found - fall through to 403
             }
         }
 
@@ -32,268 +40,127 @@ global with sharing class WhatsAppWebhookHandler {
     }
 
     /**
-     * @description Handle incoming webhook messages (POST request)
+     * @description Handle incoming webhook messages and status updates (POST request).
+     *              Validates HMAC signature if enabled, parses the payload, publishes
+     *              Platform Events for messages, and updates statuses.
+     *              Always returns 200 to prevent WhatsApp retries.
      */
     @HttpPost
     global static void handleIncomingMessage() {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
+        String requestBody = '';
 
         try {
-            String requestBody = req.requestBody.toString();
-            System.debug('Webhook payload: ' + requestBody);
+            requestBody = req.requestBody.toString();
 
-            Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(requestBody);
+            // HMAC signature validation
+            if (WhatsAppConfigService.isHmacValidationEnabled()) {
+                WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
+                String appSecret = config.Webhook_Verify_Token__c;
 
-            // Parse WhatsApp webhook structure
-            List<Object> entries = (List<Object>) payload.get('entry');
+                if (!WhatsAppHmacValidator.validateFromRequest(req, appSecret)) {
+                    res.statusCode = 401;
+                    res.responseBody = Blob.valueOf('{"status":"unauthorized"}');
+                    return;
+                }
+            }
 
-            if (entries != null && !entries.isEmpty()) {
-                for (Object entryObj : entries) {
-                    Map<String, Object> entry = (Map<String, Object>) entryObj;
-                    List<Object> changes = (List<Object>) entry.get('changes');
+            // Parse payload using the dedicated parser
+            WhatsAppWebhookParser.WebhookPayload payload = WhatsAppWebhookParser.parse(requestBody);
 
-                    if (changes != null) {
-                        for (Object changeObj : changes) {
-                            Map<String, Object> change = (Map<String, Object>) changeObj;
-                            Map<String, Object> value = (Map<String, Object>) change.get('value');
+            // Extract messages and statuses
+            List<WhatsAppWebhookParser.ParsedMessage> messages = WhatsAppWebhookParser.extractMessages(payload);
+            List<WhatsAppWebhookParser.StatusUpdate> statuses = WhatsAppWebhookParser.extractStatuses(payload);
 
-                            if (value != null) {
-                                // Process messages
-                                List<Object> messages = (List<Object>) value.get('messages');
-                                if (messages != null) {
-                                    for (Object msgObj : messages) {
-                                        Map<String, Object> message = (Map<String, Object>) msgObj;
-                                        processIncomingMessage(message);
-                                    }
-                                }
+            // Publish Platform Events for each inbound message
+            if (!messages.isEmpty()) {
+                List<WhatsApp_Inbound_Event__e> events = new List<WhatsApp_Inbound_Event__e>();
 
-                                // Process message status updates
-                                List<Object> statuses = (List<Object>) value.get('statuses');
-                                if (statuses != null) {
-                                    for (Object statusObj : statuses) {
-                                        Map<String, Object> status = (Map<String, Object>) statusObj;
-                                        processMessageStatus(status);
-                                    }
-                                }
-                            }
+                for (WhatsAppWebhookParser.ParsedMessage msg : messages) {
+                    WhatsApp_Inbound_Event__e evt = new WhatsApp_Inbound_Event__e();
+                    evt.Conversation_ID__c = '';
+                    evt.Message_ID__c = msg.id;
+                    evt.Customer_Phone__c = msg.from_field;
+                    evt.Message_Type__c = msg.type;
+                    evt.Message_Content__c = getMessageContent(msg);
+                    evt.Payload_JSON__c = msg.rawJson;
+                    events.add(evt);
+                }
+
+                if (!events.isEmpty()) {
+                    List<Database.SaveResult> results = EventBus.publish(events);
+                    for (Database.SaveResult sr : results) {
+                        if (!sr.isSuccess()) {
+                            System.debug('Failed to publish Platform Event: ' + sr.getErrors());
                         }
                     }
                 }
             }
 
-            res.statusCode = 200;
-            res.responseBody = Blob.valueOf('{"status":"success"}');
-        } catch (Exception e) {
-            System.debug('Error processing webhook: ' + e.getMessage());
-            System.debug('Stack trace: ' + e.getStackTraceString());
-            res.statusCode = 500;
-            res.responseBody = Blob.valueOf('{"status":"error","message":"' + e.getMessage() + '"}');
-        }
-    }
-
-    /**
-     * @description Process incoming message from webhook
-     */
-    private static void processIncomingMessage(Map<String, Object> message) {
-        try {
-            String messageId = (String) message.get('id');
-            String fromPhone = (String) message.get('from');
-            String timestamp = (String) message.get('timestamp');
-            String messageType = (String) message.get('type');
-
-            WhatsApp_Configuration__c config = getActiveConfiguration();
-            String businessPhone = config.Phone_Number__c;
-
-            // Find or create conversation
-            String conversationId = findOrCreateConversation(fromPhone, businessPhone);
-
-            // Create message record
-            WhatsApp_Message__c msg = new WhatsApp_Message__c(
-                Message_ID__c = messageId,
-                Conversation__c = conversationId,
-                Direction__c = 'Inbound',
-                Message_Type__c = capitalizeFirstLetter(messageType),
-                Sender_Phone__c = fromPhone,
-                Recipient_Phone__c = businessPhone,
-                Message_Status__c = 'Received',
-                Timestamp__c = convertTimestampToDateTime(timestamp)
-            );
-
-            // Extract message content based on type
-            if (messageType == 'text') {
-                Map<String, Object> textObj = (Map<String, Object>) message.get('text');
-                if (textObj != null) {
-                    msg.Content__c = (String) textObj.get('body');
-                }
-            } else if (messageType == 'location') {
-                Map<String, Object> locationObj = (Map<String, Object>) message.get('location');
-                if (locationObj != null) {
-                    msg.Latitude__c = (Decimal) locationObj.get('latitude');
-                    msg.Longitude__c = (Decimal) locationObj.get('longitude');
-                    String locationName = (String) locationObj.get('name');
-                    String locationAddress = (String) locationObj.get('address');
-                    msg.Content__c = 'Location: ' + (locationName != null ? locationName : '') +
-                                    (locationAddress != null ? ' - ' + locationAddress : '');
-                }
-            } else if (messageType == 'image' || messageType == 'video' ||
-                      messageType == 'audio' || messageType == 'document') {
-                Map<String, Object> mediaObj = (Map<String, Object>) message.get(messageType);
-                if (mediaObj != null) {
-                    String mediaId = (String) mediaObj.get('id');
-                    String caption = (String) mediaObj.get('caption');
-                    msg.Content__c = caption != null ? caption : 'Media file received';
-
-                    // Create media record (will be downloaded asynchronously)
-                    insert msg;
-                    createMediaRecord(msg.Id, mediaId, messageType, mediaObj);
-                    return;
+            // Process status updates
+            if (!statuses.isEmpty()) {
+                for (WhatsAppWebhookParser.StatusUpdate statusUpdate : statuses) {
+                    try {
+                        WhatsAppMessageService.updateMessageStatus(statusUpdate.id, statusUpdate.status);
+                    } catch (Exception statusEx) {
+                        WhatsAppErrorLogger.logWebhookError(
+                            'Error updating message status for ' + statusUpdate.id,
+                            requestBody,
+                            statusEx
+                        );
+                    }
                 }
             }
 
-            insert msg;
-
-            // Update conversation
-            updateConversation(conversationId);
-
-            // Route to Agentforce
-            routeToAgentforce(conversationId, msg.Id);
-
         } catch (Exception e) {
-            System.debug('Error processing incoming message: ' + e.getMessage());
-            throw e;
+            WhatsAppErrorLogger.logWebhookError('Error processing webhook', requestBody, e);
         }
+
+        // Always return 200 - WhatsApp will retry on non-2xx responses
+        res.statusCode = 200;
+        res.responseBody = Blob.valueOf('{"status":"ok"}');
     }
 
     /**
-     * @description Process message status updates
+     * @description Extracts a human-readable content string from a parsed message.
+     *              Returns the text body for text messages, or a descriptive label
+     *              for other message types (e.g., caption or type name).
+     * @param msg The parsed message
+     * @return Content string for the Platform Event
      */
-    private static void processMessageStatus(Map<String, Object> status) {
-        try {
-            String messageId = (String) status.get('id');
-            String statusValue = (String) status.get('status');
-
-            List<WhatsApp_Message__c> messages = [
-                SELECT Id, Message_Status__c
-                FROM WhatsApp_Message__c
-                WHERE Message_ID__c = :messageId
-                LIMIT 1
-            ];
-
-            if (!messages.isEmpty()) {
-                WhatsApp_Message__c msg = messages[0];
-                msg.Message_Status__c = capitalizeFirstLetter(statusValue);
-                update msg;
+    private static String getMessageContent(WhatsAppWebhookParser.ParsedMessage msg) {
+        if (msg.type == WhatsAppConstants.TYPE_TEXT && msg.text != null) {
+            return msg.text.body;
+        } else if (msg.type == WhatsAppConstants.TYPE_IMAGE && msg.image != null) {
+            return String.isNotBlank(msg.image.caption) ? msg.image.caption : 'image';
+        } else if (msg.type == WhatsAppConstants.TYPE_VIDEO && msg.video != null) {
+            return String.isNotBlank(msg.video.caption) ? msg.video.caption : 'video';
+        } else if (msg.type == WhatsAppConstants.TYPE_AUDIO) {
+            return 'audio';
+        } else if (msg.type == WhatsAppConstants.TYPE_DOCUMENT && msg.document != null) {
+            return String.isNotBlank(msg.document.caption) ? msg.document.caption : 'document';
+        } else if (msg.type == WhatsAppConstants.TYPE_LOCATION && msg.location != null) {
+            String locLabel = 'location';
+            if (String.isNotBlank(msg.location.name)) {
+                locLabel = msg.location.name;
             }
-        } catch (Exception e) {
-            System.debug('Error updating message status: ' + e.getMessage());
-        }
-    }
-
-    /**
-     * @description Find or create conversation record
-     */
-    private static String findOrCreateConversation(String customerPhone, String businessPhone) {
-        List<WhatsApp_Conversation__c> conversations = [
-            SELECT Id
-            FROM WhatsApp_Conversation__c
-            WHERE Customer_Phone__c = :customerPhone
-            AND Status__c != 'Closed'
-            ORDER BY CreatedDate DESC
-            LIMIT 1
-        ];
-
-        if (!conversations.isEmpty()) {
-            return conversations[0].Id;
+            return locLabel;
+        } else if (msg.type == WhatsAppConstants.TYPE_STICKER) {
+            return 'sticker';
+        } else if (msg.type == WhatsAppConstants.TYPE_CONTACTS) {
+            return 'contacts';
+        } else if (msg.type == WhatsAppConstants.TYPE_INTERACTIVE && msg.interactive != null) {
+            if (msg.interactive.buttonReply != null) {
+                return msg.interactive.buttonReply.title;
+            } else if (msg.interactive.listReply != null) {
+                return msg.interactive.listReply.title;
+            }
+            return 'interactive';
+        } else if (msg.type == WhatsAppConstants.TYPE_REACTION && msg.reaction != null) {
+            return msg.reaction.emoji;
         }
 
-        // Create new conversation
-        WhatsApp_Conversation__c conv = new WhatsApp_Conversation__c(
-            Customer_Phone__c = customerPhone,
-            Status__c = 'Active',
-            Last_Message_Time__c = System.now(),
-            Message_Count__c = 0
-        );
-        insert conv;
-
-        return conv.Id;
-    }
-
-    /**
-     * @description Update conversation metadata
-     */
-    private static void updateConversation(String conversationId) {
-        WhatsApp_Conversation__c conv = [
-            SELECT Id, Message_Count__c
-            FROM WhatsApp_Conversation__c
-            WHERE Id = :conversationId
-        ];
-
-        conv.Last_Message_Time__c = System.now();
-        conv.Message_Count__c = conv.Message_Count__c != null ? conv.Message_Count__c + 1 : 1;
-        conv.Status__c = 'Active';
-        update conv;
-    }
-
-    /**
-     * @description Create media record for async download
-     */
-    private static void createMediaRecord(String messageId, String mediaId, String mediaType, Map<String, Object> mediaObj) {
-        try {
-            WhatsApp_Media__c media = new WhatsApp_Media__c(
-                Message__c = messageId,
-                Media_ID__c = mediaId,
-                Media_Type__c = capitalizeFirstLetter(mediaType),
-                MIME_Type__c = (String) mediaObj.get('mime_type'),
-                File_Name__c = (String) mediaObj.get('filename'),
-                Download_Status__c = 'Pending'
-            );
-            insert media;
-
-            // Trigger async download
-            WhatsAppMediaHandler.downloadMediaAsync(media.Id);
-        } catch (Exception e) {
-            System.debug('Error creating media record: ' + e.getMessage());
-        }
-    }
-
-    /**
-     * @description Route message to Agentforce
-     */
-    private static void routeToAgentforce(String conversationId, String messageId) {
-        // Queue for Agentforce processing
-        if (!System.isFuture() && !System.isBatch()) {
-            WhatsAppAgentforceHandler.processMessageAsync(conversationId, messageId);
-        }
-    }
-
-    /**
-     * @description Get active configuration
-     */
-    private static WhatsApp_Configuration__c getActiveConfiguration() {
-        List<WhatsApp_Configuration__c> configs = [
-            SELECT Id, Phone_Number__c, Webhook_Verify_Token__c
-            FROM WhatsApp_Configuration__c
-            WHERE Is_Active__c = true
-            LIMIT 1
-        ];
-
-        return configs.isEmpty() ? null : configs[0];
-    }
-
-    /**
-     * @description Convert Unix timestamp to DateTime
-     */
-    private static DateTime convertTimestampToDateTime(String timestamp) {
-        Long unixTime = Long.valueOf(timestamp);
-        return DateTime.newInstance(unixTime * 1000);
-    }
-
-    /**
-     * @description Capitalize first letter of string
-     */
-    private static String capitalizeFirstLetter(String str) {
-        if (String.isBlank(str)) return str;
-        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
+        return msg.type;
     }
 }

@@ -1,130 +1,261 @@
 <template>
-    <lightning-card title="WhatsApp Configuration" icon-name="custom:custom78">
-        <div class="slds-m-around_medium">
-            <template if:true={isLoading}>
-                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
-            </template>
+    <lightning-card title="WhatsApp Configuration" icon-name="custom:custom18">
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </template>
 
-            <template if:false={isLoading}>
-                <div class="slds-grid slds-wrap slds-gutters">
-                    <!-- API Key -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="API Key"
-                            type="password"
-                            value={config.API_Key__c}
-                            data-field="API_Key__c"
-                            onchange={handleInputChange}
-                            required>
-                        </lightning-input>
-                    </div>
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
 
-                    <!-- Phone Number -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="Phone Number"
-                            type="tel"
-                            value={config.Phone_Number__c}
-                            data-field="Phone_Number__c"
-                            onchange={handleInputChange}
-                            placeholder="+1234567890"
-                            required>
-                        </lightning-input>
-                    </div>
-
-                    <!-- API Base URL -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="API Base URL"
-                            type="url"
-                            value={config.API_Base_URL__c}
-                            data-field="API_Base_URL__c"
-                            onchange={handleInputChange}
-                            required>
-                        </lightning-input>
-                    </div>
-
-                    <!-- Business Account ID -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="Business Account ID"
-                            type="text"
-                            value={config.Business_Account_ID__c}
-                            data-field="Business_Account_ID__c"
-                            onchange={handleInputChange}>
-                        </lightning-input>
-                    </div>
-
-                    <!-- Webhook Verify Token -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="Webhook Verify Token"
-                            type="password"
-                            value={config.Webhook_Verify_Token__c}
-                            data-field="Webhook_Verify_Token__c"
-                            onchange={handleInputChange}>
-                        </lightning-input>
-                    </div>
-
-                    <!-- Is Active -->
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-input
-                            label="Active"
-                            type="checkbox"
-                            checked={config.Is_Active__c}
-                            data-field="Is_Active__c"
-                            onchange={handleCheckboxChange}>
-                        </lightning-input>
-                    </div>
-
-                    <!-- Webhook URL (Read-only) -->
-                    <div class="slds-col slds-size_1-of-1">
-                        <div class="slds-form-element">
-                            <label class="slds-form-element__label">Webhook URL</label>
-                            <div class="slds-form-element__control">
-                                <div class="slds-input-has-icon slds-input-has-icon_right">
-                                    <lightning-input
-                                        value={webhookUrl}
-                                        readonly>
-                                    </lightning-input>
-                                    <lightning-button-icon
-                                        icon-name="utility:copy"
-                                        variant="bare"
-                                        alternative-text="Copy"
-                                        title="Copy URL"
-                                        class="slds-input__icon slds-input__icon_right"
-                                        onclick={copyWebhookUrl}>
-                                    </lightning-button-icon>
+            <!-- API Credentials Section -->
+            <div class="config-section">
+                <div class="section-header" data-section="apiCredentials" onclick={toggleSection}>
+                    <lightning-icon
+                        icon-name={apiCredentialsChevron}
+                        size="x-small"
+                        class={apiCredentialsChevronClass}
+                    ></lightning-icon>
+                    <h2 class="slds-text-heading_small slds-m-left_x-small">API Credentials</h2>
+                </div>
+                <template if:true={sections.apiCredentials}>
+                    <div class="section-body">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <div class="slds-grid slds-grid_vertical-align-end">
+                                    <div class="slds-col slds-grow">
+                                        <lightning-input
+                                            label="API Key"
+                                            type={apiKeyInputType}
+                                            value={config.API_Key__c}
+                                            data-field="API_Key__c"
+                                            onchange={handleInputChange}
+                                            placeholder="Enter your WhatsApp API key"
+                                        ></lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-m-left_xx-small toggle-btn">
+                                        <lightning-button-icon
+                                            icon-name={apiKeyToggleIcon}
+                                            alternative-text={apiKeyToggleAlt}
+                                            variant="border-filled"
+                                            onclick={toggleApiKeyVisibility}
+                                        ></lightning-button-icon>
+                                    </div>
                                 </div>
-                                <div class="slds-form-element__help">
-                                    Use this URL when configuring your WhatsApp webhook
-                                </div>
+                            </div>
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                <lightning-input
+                                    label="API Base URL"
+                                    type="text"
+                                    value={config.API_Base_URL__c}
+                                    data-field="API_Base_URL__c"
+                                    onchange={handleInputChange}
+                                    placeholder="https://graph.facebook.com"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                <lightning-input
+                                    label="WhatsApp API Version"
+                                    type="text"
+                                    value={config.WhatsApp_API_Version__c}
+                                    data-field="WhatsApp_API_Version__c"
+                                    onchange={handleInputChange}
+                                    placeholder="v21.0"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Business Account ID"
+                                    type="text"
+                                    value={config.Business_Account_ID__c}
+                                    data-field="Business_Account_ID__c"
+                                    onchange={handleInputChange}
+                                ></lightning-input>
                             </div>
                         </div>
                     </div>
-                </div>
+                </template>
+            </div>
 
-                <!-- Action Buttons -->
-                <div class="slds-m-top_medium">
-                    <lightning-button
-                        variant="brand"
-                        label="Save Configuration"
-                        onclick={handleSave}
-                        disabled={isLoading}
-                        class="slds-m-right_small">
-                    </lightning-button>
-                    <lightning-button
-                        variant="neutral"
-                        label="Test Connection"
-                        onclick={handleTestConnection}
-                        disabled={isTesting}
-                        class="slds-m-right_small">
-                    </lightning-button>
-                    <template if:true={isTesting}>
-                        <lightning-spinner alternative-text="Testing" size="small"></lightning-spinner>
-                    </template>
+            <!-- Phone Number Settings Section -->
+            <div class="config-section">
+                <div class="section-header" data-section="phoneSettings" onclick={toggleSection}>
+                    <lightning-icon
+                        icon-name={phoneSettingsChevron}
+                        size="x-small"
+                        class={phoneSettingsChevronClass}
+                    ></lightning-icon>
+                    <h2 class="slds-text-heading_small slds-m-left_x-small">Phone Number Settings</h2>
                 </div>
-            </template>
+                <template if:true={sections.phoneSettings}>
+                    <div class="section-body">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Phone Number"
+                                    type="tel"
+                                    value={config.Phone_Number__c}
+                                    data-field="Phone_Number__c"
+                                    onchange={handleInputChange}
+                                    placeholder="+1234567890"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Phone Number ID"
+                                    type="text"
+                                    value={config.Phone_Number_ID__c}
+                                    data-field="Phone_Number_ID__c"
+                                    onchange={handleInputChange}
+                                    placeholder="Meta API Phone Number ID"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Display Phone Number"
+                                    type="tel"
+                                    value={config.Display_Phone_Number__c}
+                                    data-field="Display_Phone_Number__c"
+                                    onchange={handleInputChange}
+                                    placeholder="Human-readable phone number"
+                                ></lightning-input>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Webhook Settings Section -->
+            <div class="config-section">
+                <div class="section-header" data-section="webhookSettings" onclick={toggleSection}>
+                    <lightning-icon
+                        icon-name={webhookSettingsChevron}
+                        size="x-small"
+                        class={webhookSettingsChevronClass}
+                    ></lightning-icon>
+                    <h2 class="slds-text-heading_small slds-m-left_x-small">Webhook Settings</h2>
+                </div>
+                <template if:true={sections.webhookSettings}>
+                    <div class="section-body">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <div class="slds-grid slds-grid_vertical-align-end">
+                                    <div class="slds-col slds-grow">
+                                        <lightning-input
+                                            label="Webhook Verify Token"
+                                            type={webhookTokenInputType}
+                                            value={config.Webhook_Verify_Token__c}
+                                            data-field="Webhook_Verify_Token__c"
+                                            onchange={handleInputChange}
+                                            placeholder="Enter your webhook verify token"
+                                        ></lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-m-left_xx-small toggle-btn">
+                                        <lightning-button-icon
+                                            icon-name={webhookTokenToggleIcon}
+                                            alternative-text={webhookTokenToggleAlt}
+                                            variant="border-filled"
+                                            onclick={toggleWebhookTokenVisibility}
+                                        ></lightning-button-icon>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <div class="slds-grid slds-grid_vertical-align-end">
+                                    <div class="slds-col slds-grow">
+                                        <lightning-input
+                                            label="Webhook URL"
+                                            type="text"
+                                            value={config.Webhook_URL__c}
+                                            data-field="Webhook_URL__c"
+                                            readonly
+                                        ></lightning-input>
+                                    </div>
+                                    <div class="slds-col slds-m-left_xx-small toggle-btn">
+                                        <lightning-button-icon
+                                            icon-name="utility:copy_to_clipboard"
+                                            alternative-text="Copy Webhook URL"
+                                            variant="border-filled"
+                                            onclick={handleCopyWebhookUrl}
+                                        ></lightning-button-icon>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="HMAC Validation Enabled"
+                                    type="checkbox"
+                                    checked={config.HMAC_Validation_Enabled__c}
+                                    data-field="HMAC_Validation_Enabled__c"
+                                    onchange={handleCheckboxChange}
+                                ></lightning-input>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Agentforce Settings Section -->
+            <div class="config-section">
+                <div class="section-header" data-section="agentforceSettings" onclick={toggleSection}>
+                    <lightning-icon
+                        icon-name={agentforceSettingsChevron}
+                        size="x-small"
+                        class={agentforceSettingsChevronClass}
+                    ></lightning-icon>
+                    <h2 class="slds-text-heading_small slds-m-left_x-small">Agentforce Settings</h2>
+                </div>
+                <template if:true={sections.agentforceSettings}>
+                    <div class="section-body">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Agentforce Agent ID"
+                                    type="text"
+                                    value={config.Agentforce_Agent_Id__c}
+                                    data-field="Agentforce_Agent_Id__c"
+                                    onchange={handleInputChange}
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Session Timeout (Minutes)"
+                                    type="number"
+                                    value={config.Session_Timeout_Minutes__c}
+                                    data-field="Session_Timeout_Minutes__c"
+                                    onchange={handleInputChange}
+                                    min="1"
+                                    placeholder="1440"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-2 slds-m-bottom_small slds-grid slds-grid_vertical-align-end">
+                                <lightning-input
+                                    label="Auto Download Media"
+                                    type="checkbox"
+                                    checked={config.Auto_Download_Media__c}
+                                    data-field="Auto_Download_Media__c"
+                                    onchange={handleCheckboxChange}
+                                ></lightning-input>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="slds-m-top_medium slds-grid slds-grid_align-end">
+                <lightning-button
+                    label="Test Connection"
+                    variant="neutral"
+                    onclick={handleTestConnection}
+                    disabled={disableTestConnection}
+                    class="slds-m-right_small"
+                ></lightning-button>
+                <lightning-button
+                    label="Save Configuration"
+                    variant="brand"
+                    onclick={handleSave}
+                    disabled={isSaving}
+                ></lightning-button>
+            </div>
         </div>
     </lightning-card>
 </template>

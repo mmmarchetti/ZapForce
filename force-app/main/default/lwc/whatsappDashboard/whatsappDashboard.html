@@ -1,0 +1,40 @@
+<template>
+    <div class="dashboard-container">
+        <div class="slds-page-header slds-m-bottom_medium">
+            <div class="slds-page-header__row">
+                <div class="slds-page-header__col-title">
+                    <div class="slds-media">
+                        <div class="slds-media__figure">
+                            <lightning-icon icon-name="custom:custom78" size="large"></lightning-icon>
+                        </div>
+                        <div class="slds-media__body">
+                            <div class="slds-page-header__name">
+                                <div class="slds-page-header__name-title">
+                                    <h1>
+                                        <span class="slds-page-header__title slds-truncate" title="WhatsApp Integration">WhatsApp Integration Dashboard</span>
+                                    </h1>
+                                </div>
+                            </div>
+                            <p class="slds-page-header__name-meta">Manage your WhatsApp Business API integration with Salesforce Agentforce</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <lightning-tabset variant="scoped" active-tab-value={activeTab} onactive={handleTabChange}>
+            <lightning-tab label="Configuration" value="configuration" icon-name="utility:settings">
+                <c-whatsapp-configuration></c-whatsapp-configuration>
+            </lightning-tab>
+            <lightning-tab label="Conversations" value="conversations" icon-name="utility:chat">
+                <c-whatsapp-conversation-panel></c-whatsapp-conversation-panel>
+            </lightning-tab>
+            <lightning-tab label="Templates" value="templates" icon-name="utility:text_template">
+                <c-whatsapp-template-manager></c-whatsapp-template-manager>
+            </lightning-tab>
+            <lightning-tab label="Analytics" value="analytics" icon-name="utility:analytics">
+                <c-whatsapp-analytics></c-whatsapp-analytics>
+            </lightning-tab>
+        </lightning-tabset>
+    </div>
+</template>

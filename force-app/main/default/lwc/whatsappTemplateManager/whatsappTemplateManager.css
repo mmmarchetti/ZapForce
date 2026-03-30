@@ -1,0 +1,53 @@
+.template-preview {
+    border: 1px solid #d8dde6;
+    border-radius: 0.25rem;
+    background-color: #fafaf9;
+}
+
+.preview-header {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #080707;
+    padding: 0.5rem;
+    background-color: #e8f4e8;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.preview-body {
+    font-size: 0.9375rem;
+    color: #3e3e3c;
+    padding: 0.75rem;
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+.preview-footer {
+    font-size: 0.8125rem;
+    color: #706e6b;
+    font-style: italic;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.preview-buttons {
+    font-size: 0.8125rem;
+    color: #0176d3;
+    padding: 0.5rem;
+    background-color: #f3f3f3;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.preview-live {
+    border-left: 3px solid #04844b;
+    background-color: #f0faf4;
+}
+
+.slds-modal__content {
+    overflow: visible;
+}

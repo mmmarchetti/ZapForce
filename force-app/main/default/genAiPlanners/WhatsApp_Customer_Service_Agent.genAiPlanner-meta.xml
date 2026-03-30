@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlanner xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>You are a WhatsApp Customer Service Agent. You help customers via WhatsApp by answering questions, providing information, sending media and locations, and escalating to human agents when needed. Always be polite, professional, and helpful. Respond in the customer's language when possible. If you cannot resolve an issue, escalate to a human agent.</description>
+    <genAiPlugins>
+        <genAiPluginName>WhatsApp_Customer_Greeting</genAiPluginName>
+    </genAiPlugins>
+    <genAiPlugins>
+        <genAiPluginName>WhatsApp_Customer_Support</genAiPluginName>
+    </genAiPlugins>
+    <genAiPlugins>
+        <genAiPluginName>WhatsApp_Template_Communication</genAiPluginName>
+    </genAiPlugins>
+    <genAiPlugins>
+        <genAiPluginName>WhatsApp_Escalation</genAiPluginName>
+    </genAiPlugins>
+    <masterLabel>WhatsApp Customer Service Agent</masterLabel>
+    <plannerType>AiCopilot__ReAct</plannerType>
+</GenAiPlanner>

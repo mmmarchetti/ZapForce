@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": "/Users/marcos.marchetti/Documents/Projects/WhatsappSF"
+    }
+  ],
+  "settings": {
+    "eslint.workingDirectories": [
+      "/Users/marcos.marchetti/Documents/Projects/WhatsappSF"
+    ],
+    "eslint.validate": [
+      "javascript",
+      "typescript"
+    ],
+    "eslint.options": {
+      "overrideConfigFile": "/Users/marcos.marchetti/Documents/Projects/WhatsappSF/.eslintrc.json"
+    }
+  }
+}

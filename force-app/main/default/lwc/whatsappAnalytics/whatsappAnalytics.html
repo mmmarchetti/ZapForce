@@ -1,0 +1,70 @@
+<template>
+    <lightning-card title="WhatsApp Analytics" icon-name="standard:report">
+        <template if:true={isLoading}>
+            <div class="slds-align_absolute-center slds-p-around_large">
+                <lightning-spinner alternative-text="Loading analytics..." size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="slds-p-around_medium">
+                <!-- Row 1: Conversations and Messages Today -->
+                <div class="slds-grid slds-wrap slds-gutters">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="standard:live_chat" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Total Conversations</p>
+                            <p class="stat-value">{totalConversations}</p>
+                        </div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="standard:live_chat" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Active Conversations</p>
+                            <p class="stat-value active">{activeConversations}</p>
+                        </div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="standard:email" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Messages Today</p>
+                            <p class="stat-value">{messagesToday}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Inbound, Outbound, Media, Errors -->
+                <div class="slds-grid slds-wrap slds-gutters">
+                    <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="utility:arrowdown" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Inbound Today</p>
+                            <p class="stat-value">{inboundToday}</p>
+                        </div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="utility:arrowup" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Outbound Today</p>
+                            <p class="stat-value">{outboundToday}</p>
+                        </div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="utility:file" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Media This Week</p>
+                            <p class="stat-value">{mediaCount}</p>
+                        </div>
+                    </div>
+                    <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-p-bottom_small">
+                        <div class="stat-card">
+                            <lightning-icon icon-name="utility:warning" size="small" class="slds-m-bottom_x-small"></lightning-icon>
+                            <p class="stat-label">Unresolved Errors</p>
+                            <p class={errorClass}>{errorCount}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </lightning-card>
+</template>

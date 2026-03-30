@@ -1,0 +1,149 @@
+<template>
+    <lightning-card title="WhatsApp Message Templates" icon-name="standard:template">
+        <div slot="actions">
+            <lightning-button
+                label="Sync Templates"
+                icon-name="utility:refresh"
+                variant="brand"
+                onclick={handleSync}
+                disabled={isSyncing}>
+            </lightning-button>
+        </div>
+
+        <div class="slds-p-around_medium">
+            <!-- Template List -->
+            <template if:true={hasTemplates}>
+                <lightning-datatable
+                    key-field="Id"
+                    data={templates}
+                    columns={columns}
+                    onrowselection={handleRowSelection}
+                    max-row-selection="1"
+                    show-row-number-column>
+                </lightning-datatable>
+            </template>
+            <template if:false={hasTemplates}>
+                <div class="slds-align_absolute-center slds-p-around_large">
+                    <p class="slds-text-color_weak">No templates found. Click "Sync Templates" to fetch from WhatsApp API.</p>
+                </div>
+            </template>
+
+            <!-- Template Preview -->
+            <template if:true={hasSelectedTemplate}>
+                <div class="template-preview slds-m-top_medium">
+                    <lightning-card title="Template Preview">
+                        <div class="slds-p-around_medium">
+                            <div class="slds-grid slds-wrap slds-gutters">
+                                <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Name</span>
+                                    <p class="slds-text-body_regular">{selectedTemplate.Template_Name__c}</p>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Language</span>
+                                    <p class="slds-text-body_regular">{selectedTemplate.Language__c}</p>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Category</span>
+                                    <p class="slds-text-body_regular">{selectedTemplate.Category__c}</p>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Status</span>
+                                    <p class="slds-text-body_regular">{selectedTemplate.Status__c}</p>
+                                </div>
+                            </div>
+
+                            <template if:true={selectedTemplate.Header_Text__c}>
+                                <div class="slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Header</span>
+                                    <p class="preview-header">{selectedTemplate.Header_Text__c}</p>
+                                </div>
+                            </template>
+
+                            <div class="slds-m-bottom_small">
+                                <span class="slds-text-title_caps">Body</span>
+                                <div class="preview-body">{previewBody}</div>
+                            </div>
+
+                            <template if:true={selectedTemplate.Footer_Text__c}>
+                                <div class="slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Footer</span>
+                                    <p class="preview-footer">{selectedTemplate.Footer_Text__c}</p>
+                                </div>
+                            </template>
+
+                            <template if:true={selectedTemplate.Buttons_Json__c}>
+                                <div class="slds-m-bottom_small">
+                                    <span class="slds-text-title_caps">Buttons</span>
+                                    <p class="preview-buttons">{selectedTemplate.Buttons_Json__c}</p>
+                                </div>
+                            </template>
+
+                            <div class="slds-m-top_medium">
+                                <lightning-button
+                                    label="Send Template"
+                                    icon-name="utility:email"
+                                    variant="brand"
+                                    onclick={handleOpenSendModal}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </lightning-card>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- Send Template Modal -->
+    <template if:true={showSendModal}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                            title="Close" onclick={handleCloseSendModal}>
+                        <lightning-icon icon-name="utility:close" alternative-text="Close" size="small"></lightning-icon>
+                    </button>
+                    <h2 class="slds-modal__title">Send Template Message</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <lightning-combobox
+                        name="conversation"
+                        label="Select Conversation"
+                        placeholder="Choose a conversation..."
+                        options={conversations}
+                        value={selectedConversationId}
+                        onchange={handleConversationChange}
+                        required>
+                    </lightning-combobox>
+
+                    <template if:true={hasVariables}>
+                        <div class="slds-m-top_medium">
+                            <h3 class="slds-text-heading_small slds-m-bottom_small">Template Variables</h3>
+                            <template for:each={variableValues} for:item="variable">
+                                <lightning-input
+                                    key={variable.index}
+                                    label={variable.label}
+                                    value={variable.value}
+                                    data-index={variable.index}
+                                    onchange={handleVariableChange}
+                                    class="slds-m-bottom_x-small">
+                                </lightning-input>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template if:true={previewBody}>
+                        <div class="slds-m-top_medium">
+                            <span class="slds-text-title_caps">Live Preview</span>
+                            <div class="preview-body preview-live">{previewBody}</div>
+                        </div>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button label="Cancel" onclick={handleCloseSendModal}></lightning-button>
+                    <lightning-button label="Send" variant="brand" onclick={handleSendTemplate} class="slds-m-left_x-small"></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

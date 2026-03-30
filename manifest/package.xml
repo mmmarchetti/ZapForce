@@ -40,5 +40,25 @@
         <members>*</members>
         <name>CustomMetadata</name>
     </types>
-    <version>60.0</version>
+    <types>
+        <members>*</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>PlatformEventChannel</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>GenAiFunction</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>GenAiPlugin</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>GenAiPlanner</name>
+    </types>
+    <version>62.0</version>
 </Package>

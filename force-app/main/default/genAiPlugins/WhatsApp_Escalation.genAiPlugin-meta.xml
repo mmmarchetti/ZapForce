@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlugin xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <description>Handles escalation to human agents when the AI cannot resolve a customer issue, the customer is frustrated, or they explicitly request a human agent.</description>
+    <developerName>WhatsApp_Escalation</developerName>
+    <genAiFunctions>
+        <functionName>WhatsAppEscalateAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppSendTextAction</functionName>
+    </genAiFunctions>
+    <genAiFunctions>
+        <functionName>WhatsAppMarkReadAction</functionName>
+    </genAiFunctions>
+    <genAiPluginInstructions>
+        <description>When a customer is frustrated, the issue is complex, or they explicitly ask for a human agent, escalate the conversation. Always notify the customer that a human agent will assist them.</description>
+        <developerName>instruction_0</developerName>
+        <language xsi:nil="true"/>
+        <masterLabel>instruction_0</masterLabel>
+    </genAiPluginInstructions>
+    <language>en_US</language>
+    <masterLabel>WhatsApp Escalation</masterLabel>
+    <pluginType>Topic</pluginType>
+    <scope>You handle escalation when AI cannot resolve the customer's issue. Create a case and notify the customer.</scope>
+</GenAiPlugin>

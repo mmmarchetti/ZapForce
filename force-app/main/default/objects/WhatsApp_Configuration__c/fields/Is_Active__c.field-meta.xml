@@ -3,7 +3,6 @@
     <fullName>Is_Active__c</fullName>
     <defaultValue>true</defaultValue>
     <description>Indicates if this configuration is currently active</description>
-    <externalId>false</externalId>
     <label>Is Active</label>
     <trackHistory>false</trackHistory>
     <trackTrending>false</trackTrending>

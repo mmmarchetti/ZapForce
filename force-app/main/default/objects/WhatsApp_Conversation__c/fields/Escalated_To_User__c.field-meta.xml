@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Escalated_To_User__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>User assigned when conversation is escalated from Agentforce</description>
+    <externalId>false</externalId>
+    <label>Escalated To User</label>
+    <referenceTo>User</referenceTo>
+    <relationshipLabel>WhatsApp Conversations</relationshipLabel>
+    <relationshipName>WhatsApp_Conversations</relationshipName>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>
