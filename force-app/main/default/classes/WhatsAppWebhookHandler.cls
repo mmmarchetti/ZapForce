@@ -6,7 +6,7 @@
  * URL: /services/apexrest/whatsapp/webhook
  */
 @RestResource(urlMapping='/whatsapp/webhook/*')
-global with sharing class WhatsAppWebhookHandler {
+global without sharing class WhatsAppWebhookHandler {
 
     /**
      * @description Handle webhook verification (GET request).
@@ -14,7 +14,7 @@ global with sharing class WhatsAppWebhookHandler {
      * @return The hub.challenge value on success, or 'Forbidden' on failure
      */
     @HttpGet
-    global static String handleVerification() {
+    global static void handleVerification() {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
 
@@ -28,7 +28,9 @@ global with sharing class WhatsAppWebhookHandler {
 
                 if (config != null && token == config.Webhook_Verify_Token__c) {
                     res.statusCode = 200;
-                    return challenge;
+                    res.addHeader('Content-Type', 'text/plain');
+                    res.responseBody = Blob.valueOf(challenge);
+                    return;
                 }
             } catch (Exception e) {
                 // No active config found - fall through to 403
@@ -36,7 +38,8 @@ global with sharing class WhatsAppWebhookHandler {
         }
 
         res.statusCode = 403;
-        return 'Forbidden';
+        res.addHeader('Content-Type', 'text/plain');
+        res.responseBody = Blob.valueOf('Forbidden');
     }
 
     /**

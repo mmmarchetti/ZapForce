@@ -14,13 +14,13 @@ public with sharing class WhatsAppConfigurationController {
             Map<String, Object> result = new Map<String, Object>();
             result.put('Id', config.Id);
             result.put('Name', config.Name);
-            result.put('API_Key__c', String.isNotBlank(config.API_Key__c) ? MASK : '');
+            result.put('API_Key__c', config.API_Key__c);
             result.put('Phone_Number__c', config.Phone_Number__c);
             result.put('Phone_Number_ID__c', config.Phone_Number_ID__c);
             result.put('Display_Phone_Number__c', config.Display_Phone_Number__c);
             result.put('API_Base_URL__c', config.API_Base_URL__c);
             result.put('Webhook_URL__c', config.Webhook_URL__c);
-            result.put('Webhook_Verify_Token__c', String.isNotBlank(config.Webhook_Verify_Token__c) ? MASK : '');
+            result.put('Webhook_Verify_Token__c', config.Webhook_Verify_Token__c);
             result.put('Business_Account_ID__c', config.Business_Account_ID__c);
             result.put('WhatsApp_API_Version__c', config.WhatsApp_API_Version__c);
             result.put('Agentforce_Agent_Id__c', config.Agentforce_Agent_Id__c);

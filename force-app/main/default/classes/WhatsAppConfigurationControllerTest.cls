@@ -42,13 +42,12 @@ private class WhatsAppConfigurationControllerTest {
         Test.stopTest();
 
         System.assertNotEquals(null, result, 'Should return a configuration map');
-        // API key should be masked
+        // API key should be returned as actual value (LWC password input handles masking)
         String apiKeyValue = (String) result.get('API_Key__c');
-        System.assertNotEquals('test-api-key-123', apiKeyValue, 'API key should be masked');
-        System.assert(apiKeyValue.contains('\u2022'), 'API key should contain mask characters');
-        // Webhook token should be masked
+        System.assertEquals('test-api-key-123', apiKeyValue, 'API key should be returned as actual value');
+        // Webhook token should be returned as actual value
         String webhookTokenValue = (String) result.get('Webhook_Verify_Token__c');
-        System.assertNotEquals('my-verify-token', webhookTokenValue, 'Webhook token should be masked');
+        System.assertEquals('my-verify-token', webhookTokenValue, 'Webhook token should be returned as actual value');
         // Boolean flags
         System.assertEquals(true, result.get('hasApiKey'), 'hasApiKey should be true');
         System.assertEquals(true, result.get('hasWebhookToken'), 'hasWebhookToken should be true');

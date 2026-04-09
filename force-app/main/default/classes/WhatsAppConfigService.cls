@@ -3,7 +3,7 @@
  *              Provides transaction-level caching and convenience methods for building API endpoints.
  *              Replaces duplicate getActiveConfiguration() methods across the codebase.
  */
-public with sharing class WhatsAppConfigService {
+public inherited sharing class WhatsAppConfigService {
 
     private static WhatsApp_Configuration__c cachedConfig;
 
