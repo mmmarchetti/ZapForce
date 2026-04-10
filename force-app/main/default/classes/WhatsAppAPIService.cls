@@ -223,9 +223,20 @@ public with sharing class WhatsAppAPIService {
             HttpResponse res = http.send(req);
 
             if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
+                WhatsAppLogService.logInfo(
+                    'MARK_AS_READ_SUCCESS',
+                    'WhatsAppAPIService.markAsRead',
+                    'Read receipt sent successfully for messageId=' + messageId
+                );
                 return true;
             }
 
+            WhatsAppLogService.logWarn(
+                'MARK_AS_READ_FAILED',
+                'WhatsAppAPIService.markAsRead',
+                'Failed to send read receipt for messageId=' + messageId,
+                res.getStatusCode()
+            );
             WhatsAppErrorLogger.logApiError(
                 String.valueOf(res.getStatusCode()),
                 'Failed to send read receipt for message ' + messageId,
@@ -278,6 +289,15 @@ public with sharing class WhatsAppAPIService {
         } catch (WhatsAppException e) {
             throw e;
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'GET_MEDIA_URL_EXCEPTION',
+                'WhatsAppAPIService.getMediaUrl',
+                'Error retrieving media URL for mediaId=' + mediaId + ': ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logError(WhatsAppConstants.ERROR_MEDIA, 'Error retrieving media URL', e);
             throw new WhatsAppException('Error retrieving media URL: ' + e.getMessage());
         }
@@ -318,6 +338,15 @@ public with sharing class WhatsAppAPIService {
         } catch (WhatsAppException e) {
             throw e;
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'DOWNLOAD_MEDIA_EXCEPTION',
+                'WhatsAppAPIService.downloadMedia',
+                'Error downloading media for mediaId=' + mediaId + ': ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logError(WhatsAppConstants.ERROR_MEDIA, 'Error downloading media', e);
             throw new WhatsAppException('Error downloading media: ' + e.getMessage());
         }
@@ -348,11 +377,22 @@ public with sharing class WhatsAppAPIService {
                 List<Object> messages = (List<Object>) responseMap.get('messages');
                 if (messages != null && !messages.isEmpty()) {
                     Map<String, Object> messageData = (Map<String, Object>) messages[0];
+                    WhatsAppLogService.logInfo(
+                        'SEND_MESSAGE_SUCCESS',
+                        'WhatsAppAPIService.sendMessage',
+                        'Outbound message sent successfully.'
+                    );
                     return (String) messageData.get('id');
                 }
                 throw new WhatsAppException('No message ID returned in API response');
             }
 
+            WhatsAppLogService.logWarn(
+                'SEND_MESSAGE_FAILED',
+                'WhatsAppAPIService.sendMessage',
+                'WhatsApp API returned non-success status.',
+                res.getStatusCode()
+            );
             WhatsAppErrorLogger.logApiError(
                 String.valueOf(res.getStatusCode()),
                 'WhatsApp API returned error',
@@ -363,6 +403,15 @@ public with sharing class WhatsAppAPIService {
         } catch (WhatsAppException e) {
             throw e;
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'SEND_MESSAGE_EXCEPTION',
+                'WhatsAppAPIService.sendMessage',
+                'Unexpected exception sending message: ' + e.getMessage(),
+                serializedBody,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logError(WhatsAppConstants.ERROR_API, 'Error sending WhatsApp message', e);
             throw new WhatsAppException('Error sending message: ' + e.getMessage());
         }

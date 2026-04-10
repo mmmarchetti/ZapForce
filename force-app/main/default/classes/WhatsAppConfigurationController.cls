@@ -6,7 +6,7 @@ public with sharing class WhatsAppConfigurationController {
 
     private static final String MASK = '••••••••••••••••';
 
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static Map<String, Object> getConfiguration() {
         try {
             WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();

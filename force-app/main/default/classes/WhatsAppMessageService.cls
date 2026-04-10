@@ -158,17 +158,27 @@ public with sharing class WhatsAppMessageService {
             return;
         }
 
-        List<WhatsApp_Message__c> messages = [
-            SELECT Id, Message_Status__c
+        // Message_ID__c is a LongTextArea and cannot be used in SOQL WHERE filters.
+        // We scan recent records and match in Apex to preserve behavior.
+        List<WhatsApp_Message__c> recentMessages = [
+            SELECT Id, Message_ID__c, Message_Status__c
             FROM WhatsApp_Message__c
-            WHERE Message_ID__c = :whatsappMessageId
-            LIMIT 1
+            ORDER BY CreatedDate DESC
+            LIMIT 2000
         ];
 
-        if (!messages.isEmpty()) {
-            messages[0].Message_Status__c = status;
+        WhatsApp_Message__c targetMessage;
+        for (WhatsApp_Message__c record : recentMessages) {
+            if (record.Message_ID__c == whatsappMessageId) {
+                targetMessage = record;
+                break;
+            }
+        }
+
+        if (targetMessage != null) {
+            targetMessage.Message_Status__c = status;
             try {
-                update messages[0];
+                update targetMessage;
             } catch (Exception ex) {
                 WhatsAppErrorLogger.logError(
                     WhatsAppConstants.ERROR_WEBHOOK,

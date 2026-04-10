@@ -47,7 +47,14 @@ public with sharing class WhatsAppInboundEventHandler {
 
         // Route to Agentforce (via another Queueable to allow callout)
         if (!Test.isRunningTest()) {
-            System.enqueueJob(new WhatsAppAgentforceQueueable(conv.Id, msg.Id));
+            String jobId = System.enqueueJob(new WhatsAppAgentforceQueueable(conv.Id, msg.Id));
+            WhatsAppLogService.logInfo(
+                'AGENTFORCE_QUEUEABLE_ENQUEUED',
+                'WhatsAppInboundEventHandler.processEvent',
+                'Queued Agentforce processing jobId=' + jobId +
+                ', conversationId=' + conv.Id +
+                ', messageId=' + msg.Id
+            );
         }
     }
 

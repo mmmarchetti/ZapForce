@@ -33,6 +33,7 @@ export default class WhatsappConfiguration extends LightningElement {
 
         Promise.all(promises)
             .then(([configResult, webhookUrlResult]) => {
+                console.log('configResult', configResult);
                 if (configResult) {
                     this.config = { ...configResult };
                 } else {
@@ -79,6 +80,7 @@ export default class WhatsappConfiguration extends LightningElement {
         saveConfiguration({ configData: this.config })
             .then(result => {
                 this.config = { ...this.config, Id: result };
+                console.log('saved this.config', this.config);
                 this.showToast('Success', 'Configuration saved successfully', 'success');
                 // Reload to get fresh masked values
                 return getConfiguration();
@@ -87,6 +89,7 @@ export default class WhatsappConfiguration extends LightningElement {
                 if (configResult) {
                     this.config = { ...configResult };
                 }
+                console.log('configResult', configResult);
                 this.showApiKey = false;
                 this.showWebhookToken = false;
             })

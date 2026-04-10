@@ -35,11 +35,10 @@ public with sharing class WhatsAppAgentforceService {
                 return;
             }
 
-            // Get or create Contact
-            Id contactId = getOrCreateContact(
+            // Avoid DML before callouts: use existing contact only during routing.
+            Id contactId = getContactIdForRouting(
                 message.Sender_Phone__c,
-                message.Conversation__r.Customer_Name__c,
-                conversationId
+                message.Conversation__r.Contact__c
             );
 
             // Build conversation context from recent messages
@@ -80,10 +79,31 @@ public with sharing class WhatsAppAgentforceService {
                     update outMsg;
 
                     WhatsAppConversationService.updateConversationOnMessage(conversationId, false);
+                    WhatsAppLogService.logInfo(
+                        'AGENTFORCE_RESPONSE_SENT_TO_WHATSAPP',
+                        'WhatsAppAgentforceService.processMessage',
+                        'Sent Agentforce response back to customer. waMessageId=' + waMessageId
+                    );
                 }
+            } else {
+                WhatsAppLogService.logWarn(
+                    'AGENTFORCE_EMPTY_RESPONSE',
+                    'WhatsAppAgentforceService.processMessage',
+                    'Agentforce returned empty response for conversationId=' + conversationId,
+                    null
+                );
             }
 
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'AGENTFORCE_PROCESSING_EXCEPTION',
+                'WhatsAppAgentforceService.processMessage',
+                'Failed processing message through Agentforce: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logAgentforceError(
                 'Failed to process message through Agentforce', conversationId, e
             );
@@ -112,6 +132,15 @@ public with sharing class WhatsAppAgentforceService {
             return invokeAgentRuntime(agentId, userInput, context, contactId, conversationId, sessionId);
 
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'AGENTFORCE_ROUTING_EXCEPTION',
+                'WhatsAppAgentforceService.routeToAgentforce',
+                'Agentforce routing failed: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logAgentforceError(
                 'Agentforce routing failed', conversationId, e
             );
@@ -138,14 +167,6 @@ public with sharing class WhatsAppAgentforceService {
             // Create or continue session
             if (String.isBlank(sessionId)) {
                 sessionId = createAgentSession(baseUrl, apiVersion, agentId);
-                if (String.isNotBlank(sessionId)) {
-                    // Save session ID to conversation
-                    WhatsApp_Conversation__c conv = new WhatsApp_Conversation__c(
-                        Id = conversationId,
-                        Agentforce_Session_Id__c = sessionId
-                    );
-                    update conv;
-                }
             }
 
             if (String.isBlank(sessionId)) {
@@ -185,7 +206,7 @@ public with sharing class WhatsAppAgentforceService {
             HttpResponse res = http.send(req);
 
             if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
-                return parseAgentResponse(res.getBody(), conversationId);
+                return parseAgentResponse(res.getBody());
             } else {
                 WhatsAppErrorLogger.logApiError(
                     String.valueOf(res.getStatusCode()),
@@ -197,6 +218,15 @@ public with sharing class WhatsAppAgentforceService {
             }
 
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'AGENTFORCE_RUNTIME_EXCEPTION',
+                'WhatsAppAgentforceService.invokeAgentRuntime',
+                'Agent runtime invocation failed: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             WhatsAppErrorLogger.logAgentforceError(
                 'Agent runtime invocation failed', conversationId, e
             );
@@ -236,7 +266,7 @@ public with sharing class WhatsAppAgentforceService {
     /**
      * @description Parse the response from Agentforce Runtime API
      */
-    private static String parseAgentResponse(String responseBody, Id conversationId) {
+    private static String parseAgentResponse(String responseBody) {
         try {
             Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
 
@@ -259,22 +289,25 @@ public with sharing class WhatsAppAgentforceService {
                 }
             }
 
-            // Check for topic information
-            String topic = (String) responseMap.get('topic');
-            if (String.isNotBlank(topic)) {
-                WhatsApp_Conversation__c conv = new WhatsApp_Conversation__c(
-                    Id = conversationId,
-                    Agentforce_Topic__c = topic
-                );
-                update conv;
-            }
-
         } catch (Exception e) {
             WhatsAppErrorLogger.logAgentforceError(
-                'Failed to parse agent response', conversationId, e
+                'Failed to parse agent response', null, e
             );
         }
         return null;
+    }
+
+    private static Id getContactIdForRouting(String phoneNumber, Id conversationContactId) {
+        if (conversationContactId != null) {
+            return conversationContactId;
+        }
+        List<Contact> contacts = [
+            SELECT Id
+            FROM Contact
+            WHERE Phone = :phoneNumber OR MobilePhone = :phoneNumber
+            LIMIT 1
+        ];
+        return contacts.isEmpty() ? null : contacts[0].Id;
     }
 
     /**

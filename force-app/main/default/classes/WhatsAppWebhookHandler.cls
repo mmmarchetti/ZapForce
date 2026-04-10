@@ -27,16 +27,36 @@ global without sharing class WhatsAppWebhookHandler {
                 WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
 
                 if (config != null && token == config.Webhook_Verify_Token__c) {
+                    WhatsAppLogService.logInfo(
+                        'WEBHOOK_VERIFICATION_SUCCESS',
+                        'WhatsAppWebhookHandler.handleVerification',
+                        'Webhook token validated successfully.'
+                    );
                     res.statusCode = 200;
                     res.addHeader('Content-Type', 'text/plain');
                     res.responseBody = Blob.valueOf(challenge);
                     return;
                 }
             } catch (Exception e) {
+                WhatsAppLogService.logError(
+                    'WEBHOOK_VERIFICATION_EXCEPTION',
+                    'WhatsAppWebhookHandler.handleVerification',
+                    'Exception during webhook verification: ' + e.getMessage(),
+                    null,
+                    null,
+                    e.getStackTraceString(),
+                    500
+                );
                 // No active config found - fall through to 403
             }
         }
 
+        WhatsAppLogService.logWarn(
+            'WEBHOOK_VERIFICATION_FAILED',
+            'WhatsAppWebhookHandler.handleVerification',
+            'Invalid verification request. mode=' + mode,
+            403
+        );
         res.statusCode = 403;
         res.addHeader('Content-Type', 'text/plain');
         res.responseBody = Blob.valueOf('Forbidden');
@@ -63,6 +83,12 @@ global without sharing class WhatsAppWebhookHandler {
                 String appSecret = config.Webhook_Verify_Token__c;
 
                 if (!WhatsAppHmacValidator.validateFromRequest(req, appSecret)) {
+                    WhatsAppLogService.logWarn(
+                        'WEBHOOK_HMAC_VALIDATION_FAILED',
+                        'WhatsAppWebhookHandler.handleIncomingMessage',
+                        'Incoming webhook rejected due to invalid HMAC signature.',
+                        401
+                    );
                     res.statusCode = 401;
                     res.responseBody = Blob.valueOf('{"status":"unauthorized"}');
                     return;
@@ -72,6 +98,11 @@ global without sharing class WhatsAppWebhookHandler {
             // Parse payload using the dedicated parser
             WhatsAppWebhookParser.WebhookPayload payload = WhatsAppWebhookParser.parse(requestBody);
 
+            WhatsAppLogService.logInfo(
+                'WEBHOOK_PARSED',
+                'WhatsAppWebhookHandler.handleIncomingMessage',
+                'Received webhook payload with ' + requestBody
+            );
             // Extract messages and statuses
             List<WhatsAppWebhookParser.ParsedMessage> messages = WhatsAppWebhookParser.extractMessages(payload);
             List<WhatsAppWebhookParser.StatusUpdate> statuses = WhatsAppWebhookParser.extractStatuses(payload);
@@ -83,7 +114,7 @@ global without sharing class WhatsAppWebhookHandler {
                 for (WhatsAppWebhookParser.ParsedMessage msg : messages) {
                     WhatsApp_Inbound_Event__e evt = new WhatsApp_Inbound_Event__e();
                     evt.Conversation_ID__c = '';
-                    evt.Message_ID__c = msg.id;
+                    // evt.Message_ID__c = msg.id;
                     evt.Customer_Phone__c = msg.from_field;
                     evt.Message_Type__c = msg.type;
                     evt.Message_Content__c = getMessageContent(msg);
@@ -94,7 +125,14 @@ global without sharing class WhatsAppWebhookHandler {
                 if (!events.isEmpty()) {
                     List<Database.SaveResult> results = EventBus.publish(events);
                     for (Database.SaveResult sr : results) {
+                        WhatsAppLogService.logInfo('PLATFORM_EVENT_RESULT', 'WhatsAppWebhookHandler.handleIncomingMessage', 'Published Platform Event: ' + sr.getId());
                         if (!sr.isSuccess()) {
+                            WhatsAppLogService.logWarn(
+                                'PLATFORM_EVENT_PUBLISH_FAILED',
+                                'WhatsAppWebhookHandler.handleIncomingMessage',
+                                'Failed to publish Platform Event: ' + sr.getErrors(),
+                                400
+                            );
                             System.debug('Failed to publish Platform Event: ' + sr.getErrors());
                         }
                     }
@@ -116,7 +154,23 @@ global without sharing class WhatsAppWebhookHandler {
                 }
             }
 
+            WhatsAppLogService.logInfo(
+                'WEBHOOK_PROCESSED',
+                'WhatsAppWebhookHandler.handleIncomingMessage',
+                'Processed webhook with messages=' + String.valueOf(messages.size()) +
+                ', statuses=' + String.valueOf(statuses.size())
+            );
+
         } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'WEBHOOK_PROCESSING_EXCEPTION',
+                'WhatsAppWebhookHandler.handleIncomingMessage',
+                'Error processing incoming webhook: ' + e.getMessage(),
+                requestBody,
+                null,
+                e.getStackTraceString(),
+                500
+            );
             WhatsAppErrorLogger.logWebhookError('Error processing webhook', requestBody, e);
         }
 
