@@ -8,7 +8,7 @@ WhatsApp Salesforce Integration - A comprehensive application that connects What
 
 ## Architecture
 
-### Data Model (6 Custom Objects + 2 Platform Events)
+### Data Model (7 Custom Objects + 2 Platform Events)
 
 **WhatsApp_Configuration__c** - API credentials and settings
 - API Key, Phone Number, Webhook URL, Business Account ID, Phone Number ID, Display Phone Number, API Version, Agentforce Agent Id, Session Timeout, HMAC Validation toggle, Auto Download Media toggle
@@ -18,6 +18,7 @@ WhatsApp Salesforce Integration - A comprehensive application that connects What
 
 **WhatsApp_Message__c** - All WhatsApp message types (text, image, video, audio, document, location, contact, sticker, interactive, template, reaction, contacts, system)
 - Message ID, Sender/Recipient Phone, Direction, Status, Type, Content, Timestamp, Latitude/Longitude, Location Name/Address, Context Message ID, Is Forwarded, Reaction Emoji, Interactive Type/Button, Template Name, Sticker Animated, Contact Card JSON, Error Code/Message, Is From Agentforce, Raw Payload JSON
+- `Message_ID__c` is currently a Long Text Area (1000)
 - Lookup: Message -> Conversation
 
 **WhatsApp_Media__c** - Media file storage
@@ -30,15 +31,20 @@ WhatsApp Salesforce Integration - A comprehensive application that connects What
 **WhatsApp_Error_Log__c** - Error tracking
 - Error Type, Error Code, Error Message, Stack Trace, Request/Response Payload, Related Conversation/Message, Resolved
 
+**WhatsApp_Log__c** - Operational/debug logging
+- Level, Action, Source, Status Code, Details, Request/Response Payload, Stack Trace
+- Lookup: Related Conversation, Related Message
+
 **WhatsApp_Inbound_Event__e** - Platform Event for inbound messages
 
 **WhatsApp_Outbound_Event__e** - Platform Event for outbound messages
 
-### Apex Classes (37 .cls files)
+### Apex Classes (38 .cls files)
 
 **Utility:**
 - `WhatsAppConstants` - All picklist values, API paths, string constants
 - `WhatsAppErrorLogger` - Creates WhatsApp_Error_Log__c records
+- `WhatsAppLogService` - Creates WhatsApp_Log__c records for flow observability
 - `WhatsAppConfigService` - Cached config access, endpoint builders, defaults
 - `WhatsAppHmacValidator` - HMAC-SHA256 webhook signature validation (`Crypto.generateMac()`)
 - `WhatsAppWebhookParser` - Parse all webhook message types into typed wrappers
@@ -98,7 +104,7 @@ WhatsApp Salesforce Integration - A comprehensive application that connects What
 ### Permission Sets (3)
 
 - **WhatsApp_Admin** - Full CRUD all objects including config secrets
-- **WhatsApp_Agent** - R/C/E conversations and messages, R-only templates/media/error logs, no config access
+- **WhatsApp_Agent** - R/C/E conversations and messages, R-only templates/media/error/log objects, no config access
 - **WhatsApp_Viewer** - Read-only all objects except config
 
 ## Development Commands
@@ -185,6 +191,7 @@ sf data import tree --plan data/plan.json
 
 ### Remote Site Settings
 - https://graph.facebook.com (WhatsApp Business API)
+- https://lookaside.fbsbx.com (WhatsApp media CDN download URLs)
 
 ### Webhook Handling
 - Webhook class: `WhatsAppWebhookHandler` (`@RestResource`)
@@ -198,6 +205,8 @@ sf data import tree --plan data/plan.json
 - Store WhatsApp media IDs for reference
 - WhatsApp media URLs expire - download immediately via Queueable
 - Auto Download Media toggle in configuration
+- Audio inbound is supported and stored as Salesforce Files (`ContentVersion`/`ContentDocument`)
+- `whatsappConversationPanel` supports inline `<audio>` playback when media download is completed
 
 ### Agentforce Integration
 - Platform Events (`WhatsApp_Inbound_Event__e`, `WhatsApp_Outbound_Event__e`) for real-time message routing
@@ -223,6 +232,8 @@ sf data import tree --plan data/plan.json
 | `force-app/main/default/lwc/` | Lightning Web Components (5 components) |
 | `force-app/main/default/triggers/` | Platform Event triggers |
 | `force-app/main/default/permissionsets/` | 3 permission sets (Admin, Agent, Viewer) |
+| `force-app/main/default/tabs/` | Custom tabs (includes `WhatsApp_Log__c` and `WhatsApp_Media__c`) |
+| `force-app/main/default/remoteSiteSettings/` | Remote Site Settings for API and media CDN |
 | `force-app/main/default/genAiFunctions/` | 8 GenAiFunction definitions |
 | `force-app/main/default/genAiPlugins/` | 4 GenAiPlugin (Topic) definitions |
 | `force-app/main/default/genAiPlanners/` | 1 GenAiPlanner definition |
@@ -241,14 +252,18 @@ sf data import tree --plan data/plan.json
 
 After deploying to a new org:
 1. Run `scripts/apex/fix-fls.apex` to set Field-Level Security on all custom fields
-2. Configure Remote Site Settings for `https://graph.facebook.com`
+2. Configure Remote Site Settings for:
+   - `https://graph.facebook.com`
+   - `https://lookaside.fbsbx.com`
 3. Set up WhatsApp Configuration record via the Configuration tab
 4. Configure the webhook URL in WhatsApp Business Platform
 
 ## Common Issues and Solutions
 
 ### Callout exceptions
-- Verify Remote Site Settings are configured for `graph.facebook.com`
+- Verify Remote Site Settings are configured for both:
+  - `graph.facebook.com` (API)
+  - `lookaside.fbsbx.com` (media downloads)
 - Check API credentials in WhatsApp_Configuration__c
 - Review `WhatsApp_Error_Log__c` records for details
 
