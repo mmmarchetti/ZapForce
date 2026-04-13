@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Failed_Downloads</fullName>
+    <columns>NAME</columns>
+    <columns>Media_Type__c</columns>
+    <columns>File_Name__c</columns>
+    <columns>Download_Status__c</columns>
+    <columns>Media_ID__c</columns>
+    <columns>CREATED_DATE</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Download_Status__c</field>
+        <operation>equals</operation>
+        <value>Failed</value>
+    </filters>
+    <label>Failed Downloads</label>
+</ListView>

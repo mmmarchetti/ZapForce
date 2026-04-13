@@ -120,6 +120,24 @@ export default class WhatsappConversationPanel extends LightningElement {
     }
 
     enrichMessage(msg) {
+        const mediaRecords = (msg.WhatsApp_Media__r || []).map(media => {
+            const contentVersionId = media.ContentVersion_ID__c;
+            const mediaType = (media.Media_Type__c || '').toLowerCase();
+            const messageType = (msg.Message_Type__c || '').toLowerCase();
+            const isAudio = messageType === 'audio' || mediaType === 'audio';
+            return {
+                ...media,
+                isAudio,
+                hasPlayableAudio:
+                    isAudio &&
+                    media.Download_Status__c === 'Completed' &&
+                    !!contentVersionId,
+                audioUrl: contentVersionId
+                    ? `/sfc/servlet.shepherd/version/download/${contentVersionId}`
+                    : null
+            };
+        });
+
         return {
             ...msg,
             isInbound: msg.Direction__c === 'Inbound',
@@ -134,7 +152,8 @@ export default class WhatsappConversationPanel extends LightningElement {
             isSystem: msg.Message_Type__c === 'System',
             isFailed: msg.Message_Status__c === 'Failed',
             bubbleClass: msg.Direction__c === 'Inbound' ? 'message-row inbound' : 'message-row outbound',
-            hasMedia: msg.WhatsApp_Media__r && msg.WhatsApp_Media__r.length > 0,
+            hasMedia: mediaRecords.length > 0,
+            mediaRecords,
             mediaIcon: this.getMediaIcon(msg.Message_Type__c),
             formattedTime: msg.Timestamp__c
                 ? new Date(msg.Timestamp__c).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

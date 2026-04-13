@@ -430,4 +430,8 @@
         <tab>WhatsApp_Log__c</tab>
         <visibility>Visible</visibility>
     </tabSettings>
+    <tabSettings>
+        <tab>WhatsApp_Media__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
 </PermissionSet>

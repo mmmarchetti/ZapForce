@@ -196,10 +196,23 @@ public with sharing class WhatsAppInboundEventHandler {
         WhatsApp_Media__c mediaRecord = WhatsAppMediaHandler.createMediaRecord(
             msg.Id, media.id, capitalizedType, media.mimeType, media.filename, media.caption, media.sha256
         );
+        WhatsAppLogService.logInfo(
+            'MEDIA_RECORD_CREATED',
+            'WhatsAppInboundEventHandler.handleMediaCreation',
+            'Created media record for type=' + capitalizedType +
+            ', mediaId=' + media.id +
+            ', messageId=' + msg.Id +
+            ', mediaRecordId=' + mediaRecord.Id
+        );
 
         // Queue async download if auto-download is enabled
         if (WhatsAppConfigService.isAutoDownloadMediaEnabled() && !Test.isRunningTest()) {
-            System.enqueueJob(new WhatsAppMediaDownloadQueueable(mediaRecord.Id));
+            String mediaJobId = System.enqueueJob(new WhatsAppMediaDownloadQueueable(mediaRecord.Id));
+            WhatsAppLogService.logInfo(
+                'MEDIA_DOWNLOAD_QUEUED',
+                'WhatsAppInboundEventHandler.handleMediaCreation',
+                'Queued media download jobId=' + mediaJobId + ', mediaRecordId=' + mediaRecord.Id
+            );
         }
     }
 

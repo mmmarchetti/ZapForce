@@ -218,16 +218,33 @@
 }
 
 .media-item {
-    display: flex;
-    align-items: center;
+    display: block;
     padding: 4px 0;
     font-size: 0.8rem;
+}
+
+.media-header {
+    display: flex;
+    align-items: center;
 }
 
 .media-filename {
     max-width: 180px;
     font-size: 0.8rem;
     color: #444444;
+}
+
+.audio-player-wrap {
+    display: block;
+    width: 100%;
+    min-width: 260px;
+}
+
+.audio-player {
+    display: block;
+    width: 260px;
+    max-width: 100%;
+    min-height: 36px;
 }
 
 /* Location Content */

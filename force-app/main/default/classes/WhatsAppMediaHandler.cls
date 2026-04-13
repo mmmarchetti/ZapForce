@@ -63,10 +63,6 @@ public with sharing class WhatsAppMediaHandler {
                 return;
             }
 
-            // Mark as downloading
-            media.Download_Status__c = WhatsAppConstants.DOWNLOAD_DOWNLOADING;
-            update media;
-
             // Download the binary content from WhatsApp
             Blob fileContent = WhatsAppAPIService.downloadMedia(media.Media_ID__c);
 
@@ -104,6 +100,13 @@ public with sharing class WhatsAppMediaHandler {
             media.File_Size__c = fileContent.size();
             media.Download_Status__c = WhatsAppConstants.DOWNLOAD_COMPLETED;
             update media;
+            WhatsAppLogService.logInfo(
+                'MEDIA_DOWNLOAD_COMPLETED',
+                'WhatsAppMediaHandler.downloadAndStoreMedia',
+                'Downloaded and stored media successfully. mediaRecordId=' + mediaRecordId +
+                ', mediaId=' + media.Media_ID__c +
+                ', contentVersionId=' + cv.Id
+            );
 
         } catch (Exception e) {
             // Mark as failed and log the error
@@ -119,6 +122,15 @@ public with sharing class WhatsAppMediaHandler {
                 }
             }
 
+            WhatsAppLogService.logError(
+                'MEDIA_DOWNLOAD_FAILED',
+                'WhatsAppMediaHandler.downloadAndStoreMedia',
+                'Failed to download/store media: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
             Id relatedMessageId = (media != null) ? media.Message__c : null;
             WhatsAppErrorLogger.logMediaError('Error downloading media', relatedMessageId, e);
         }

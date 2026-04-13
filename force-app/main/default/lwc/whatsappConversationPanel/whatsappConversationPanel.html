@@ -133,12 +133,21 @@
                                                         <span class="media-type-label slds-m-left_x-small">{message.Message_Type__c}</span>
                                                     </div>
                                                     <template if:true={message.hasMedia}>
-                                                        <template for:each={message.WhatsApp_Media__r} for:item="media">
+                                                        <template for:each={message.mediaRecords} for:item="media">
                                                             <div key={media.Id} class="media-item">
-                                                                <span class="media-filename slds-truncate">{media.File_Name__c}</span>
-                                                                <lightning-badge label={media.Download_Status__c}
-                                                                                class="slds-m-left_x-small">
-                                                                </lightning-badge>
+                                                                <div class="media-header">
+                                                                    <span class="media-filename slds-truncate">{media.File_Name__c}</span>
+                                                                    <lightning-badge label={media.Download_Status__c}
+                                                                                    class="slds-m-left_x-small">
+                                                                    </lightning-badge>
+                                                                </div>
+                                                                <template if:true={media.hasPlayableAudio}>
+                                                                    <div class="audio-player-wrap slds-m-top_x-small">
+                                                                        <audio controls preload="none" class="audio-player">
+                                                                            <source src={media.audioUrl} />
+                                                                        </audio>
+                                                                    </div>
+                                                                </template>
                                                             </div>
                                                         </template>
                                                     </template>
