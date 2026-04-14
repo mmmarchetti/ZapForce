@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Retrieves the most recent location shared by a customer in a WhatsApp conversation. Returns latitude, longitude, location name, address, and a Google Maps link.</description>
+    <invocationTarget>WhatsAppGetLocationInfoAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Get WhatsApp Location Info</masterLabel>
+</GenAiFunction>

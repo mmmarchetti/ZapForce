@@ -15,6 +15,8 @@ public class WhatsAppMediaDownloadQueueable implements Queueable, Database.Allow
                 'Async media download queueable completed. jobId=' + context.getJobId() +
                 ', mediaRecordId=' + mediaRecordId
             );
+            // Image analysis is triggered by WhatsAppMediaTrigger (after update)
+            // when ContentVersion_ID__c is populated by downloadAndStoreMedia()
         } catch (Exception e) {
             WhatsAppLogService.logError(
                 'MEDIA_QUEUEABLE_FAILED',

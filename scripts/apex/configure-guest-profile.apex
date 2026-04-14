@@ -31,7 +31,10 @@ List<String> apexClasses = new List<String>{
     'WhatsAppConfigurationController',
     'WhatsAppConversationController',
     'WhatsAppTemplateController',
-    'WhatsAppInboundEventHandler'
+    'WhatsAppInboundEventHandler',
+    'WhatsAppGetLocationInfoAction',
+    'WhatsAppLogService',
+    'WhatsAppAuthService'
 };
 
 // Query existing class IDs

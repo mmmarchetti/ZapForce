@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Multimodal image analysis for WhatsApp conversations</description>
+    <developerName>WhatsApp_Image_Analysis</developerName>
+    <masterLabel>WhatsApp Image Analysis</masterLabel>
+    <templateVersions>
+        <content>You are an image analysis assistant for a WhatsApp customer service chat. Analyze the following image shared by the customer:
+{!$Input:Image}
+Describe the image in detail. Include the main subject, objects, text, logos, colors, and any notable elements you see. Respond naturally and conversationally in Portuguese Brazilian.</content>
+        <inputs>
+            <apiName>Image</apiName>
+            <definition>SOBJECT://ContentDocument</definition>
+            <referenceName>Input:Image</referenceName>
+            <required>true</required>
+        </inputs>
+        <primaryModel>sfdc_ai__DefaultGPT4Omni</primaryModel>
+        <status>Published</status>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

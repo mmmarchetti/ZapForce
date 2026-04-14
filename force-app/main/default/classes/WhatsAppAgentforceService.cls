@@ -5,6 +5,15 @@
  */
 public with sharing class WhatsAppAgentforceService {
 
+    /** Agent API base URL */
+    private static final String AGENT_API_BASE = 'https://api.salesforce.com/einstein/ai-agent/v1';
+
+    /** Sequence counter for agent messages within a session */
+    private static Integer sequenceCounter = 0;
+
+    /** Holds the session ID from the most recent session creation (for deferred save) */
+    private static String pendingSessionId;
+
     /**
      * @description Process an inbound WhatsApp message through Agentforce.
      *              Finds or creates a contact, builds conversation context,
@@ -16,6 +25,7 @@ public with sharing class WhatsAppAgentforceService {
         try {
             WhatsApp_Message__c message = [
                 SELECT Id, Content__c, Message_Type__c, Sender_Phone__c,
+                       Latitude__c, Longitude__c, Location_Name__c, Location_Address__c,
                        Conversation__r.Customer_Phone__c, Conversation__r.Contact__c,
                        Conversation__r.Case__c, Conversation__r.Agentforce_Session_Id__c,
                        Conversation__r.Customer_Name__c
@@ -24,7 +34,8 @@ public with sharing class WhatsAppAgentforceService {
                 LIMIT 1
             ];
 
-            // Only process text and interactive messages for Agentforce
+            // Only process text, interactive, and location messages for Agentforce
+            // Image messages are handled by WhatsAppMediaTrigger → WhatsAppImageAnalysisQueueable
             if (message.Message_Type__c != 'Text' &&
                 message.Message_Type__c != 'Interactive' &&
                 message.Message_Type__c != 'Location') {
@@ -58,12 +69,27 @@ public with sharing class WhatsAppAgentforceService {
 
             // Send response back via WhatsApp
             if (String.isNotBlank(agentResponse)) {
-                String waMessageId = WhatsAppAPIService.sendTextMessage(
-                    message.Conversation__r.Customer_Phone__c,
-                    agentResponse
-                );
+                String waMessageId;
+                try {
+                    waMessageId = WhatsAppAPIService.sendTextMessage(
+                        message.Conversation__r.Customer_Phone__c,
+                        agentResponse
+                    );
+                } catch (Exception sendEx) {
+                    System.debug('AGENTFORCE_WHATSAPP_SEND_ERROR: ' + sendEx.getMessage());
+                }
 
-                // Record the outbound message
+                // Always save session ID after all callouts complete (even if WhatsApp send failed)
+                if (String.isNotBlank(pendingSessionId)) {
+                    WhatsApp_Conversation__c conv = new WhatsApp_Conversation__c(
+                        Id = conversationId,
+                        Agentforce_Session_Id__c = pendingSessionId
+                    );
+                    update conv;
+                    pendingSessionId = null;
+                }
+
+                // Record the outbound message if WhatsApp send succeeded
                 if (String.isNotBlank(waMessageId)) {
                     WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
                     WhatsApp_Message__c outMsg = WhatsAppMessageService.createOutboundMessage(
@@ -74,7 +100,6 @@ public with sharing class WhatsAppAgentforceService {
                         agentResponse,
                         waMessageId
                     );
-                    // Mark as from Agentforce
                     outMsg.Is_From_Agentforce__c = true;
                     update outMsg;
 
@@ -86,6 +111,15 @@ public with sharing class WhatsAppAgentforceService {
                     );
                 }
             } else {
+                // Save session ID even when agent returns empty response
+                if (String.isNotBlank(pendingSessionId)) {
+                    WhatsApp_Conversation__c conv = new WhatsApp_Conversation__c(
+                        Id = conversationId,
+                        Agentforce_Session_Id__c = pendingSessionId
+                    );
+                    update conv;
+                    pendingSessionId = null;
+                }
                 WhatsAppLogService.logWarn(
                     'AGENTFORCE_EMPTY_RESPONSE',
                     'WhatsAppAgentforceService.processMessage',
@@ -132,41 +166,24 @@ public with sharing class WhatsAppAgentforceService {
             return invokeAgentRuntime(agentId, userInput, context, contactId, conversationId, sessionId);
 
         } catch (Exception e) {
-            WhatsAppLogService.logError(
-                'AGENTFORCE_ROUTING_EXCEPTION',
-                'WhatsAppAgentforceService.routeToAgentforce',
-                'Agentforce routing failed: ' + e.getMessage(),
-                null,
-                null,
-                e.getStackTraceString(),
-                null
-            );
-            WhatsAppErrorLogger.logAgentforceError(
-                'Agentforce routing failed', conversationId, e
-            );
+            // Use System.debug to avoid DML before WhatsApp API callout
+            System.debug('AGENTFORCE_ROUTING_EXCEPTION: ' + e.getMessage() + '\n' + e.getStackTraceString());
             return 'I apologize, but I\'m having trouble processing your request right now. A human agent will assist you shortly.';
         }
     }
 
     /**
-     * @description Invoke the Agentforce Runtime API to get a response.
-     *              Uses the Connect API for Agent invocation.
+     * @description Invoke the Agentforce Agent API to get a response.
+     *              Uses api.salesforce.com/einstein/ai-agent/v1/ endpoints
+     *              with JWT tokens from Connected App Client Credentials flow.
      */
     private static String invokeAgentRuntime(String agentId, String userInput,
                                               String context, Id contactId,
                                               Id conversationId, String sessionId) {
         try {
-            // Build the request to the Agents Runtime API
-            // POST /services/data/v62.0/einstein/agents/{agentId}/sessions
-            // or POST /services/data/v62.0/einstein/agents/{agentId}/sessions/{sessionId}/messages
-
-            WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
-            String baseUrl = URL.getOrgDomainUrl().toExternalForm();
-            String apiVersion = 'v62.0'; // Agents API requires v62.0+
-
             // Create or continue session
             if (String.isBlank(sessionId)) {
-                sessionId = createAgentSession(baseUrl, apiVersion, agentId);
+                sessionId = createAgentSession(agentId, conversationId);
             }
 
             if (String.isBlank(sessionId)) {
@@ -174,31 +191,46 @@ public with sharing class WhatsAppAgentforceService {
             }
 
             // Send message to agent session
-            String endpoint = baseUrl + '/services/data/' + apiVersion +
-                             '/einstein/agents/' + agentId + '/sessions/' + sessionId + '/messages';
+            // POST https://api.salesforce.com/einstein/ai-agent/v1/sessions/{sessionId}/messages
+            String endpoint = AGENT_API_BASE + '/sessions/' + sessionId + '/messages';
 
             Map<String, Object> requestBody = new Map<String, Object>{
                 'message' => new Map<String, Object>{
-                    'role' => 'EndUser',
+                    'sequenceId' => getNextSequenceId(conversationId),
+                    'type' => 'Text',
                     'text' => userInput
                 },
-                'variables' => new List<Map<String, Object>>{
-                    new Map<String, Object>{
-                        'name' => 'ContactId',
-                        'value' => contactId
-                    },
-                    new Map<String, Object>{
-                        'name' => 'ConversationContext',
-                        'value' => context
-                    }
-                }
+                'variables' => new List<Map<String, Object>>()
             };
+
+            // Add variables if available
+            List<Map<String, Object>> variables = (List<Map<String, Object>>) requestBody.get('variables');
+            // Pass conversationId so agent actions can use it
+            variables.add(new Map<String, Object>{
+                'name' => 'conversationId',
+                'type' => 'Text',
+                'value' => String.valueOf(conversationId)
+            });
+            if (contactId != null) {
+                variables.add(new Map<String, Object>{
+                    'name' => 'ContactId',
+                    'type' => 'Text',
+                    'value' => String.valueOf(contactId)
+                });
+            }
+            if (String.isNotBlank(context)) {
+                variables.add(new Map<String, Object>{
+                    'name' => 'ConversationContext',
+                    'type' => 'Text',
+                    'value' => context
+                });
+            }
 
             HttpRequest req = new HttpRequest();
             req.setEndpoint(endpoint);
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionId());
+            req.setHeader('Authorization', 'Bearer ' + WhatsAppAuthService.getAgentforceAccessToken());
             req.setBody(JSON.serialize(requestBody));
             req.setTimeout(WhatsAppConstants.DEFAULT_TIMEOUT);
 
@@ -208,46 +240,41 @@ public with sharing class WhatsAppAgentforceService {
             if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
                 return parseAgentResponse(res.getBody());
             } else {
-                WhatsAppErrorLogger.logApiError(
-                    String.valueOf(res.getStatusCode()),
-                    'Agentforce API error',
-                    JSON.serialize(requestBody),
-                    res.getBody()
-                );
+                // Use System.debug to avoid DML before WhatsApp API callout
+                System.debug('AGENTFORCE_MESSAGE_HTTP_ERROR: HTTP ' + res.getStatusCode() + ' - ' + res.getBody());
                 return getFallbackResponse(userInput);
             }
 
         } catch (Exception e) {
-            WhatsAppLogService.logError(
-                'AGENTFORCE_RUNTIME_EXCEPTION',
-                'WhatsAppAgentforceService.invokeAgentRuntime',
-                'Agent runtime invocation failed: ' + e.getMessage(),
-                null,
-                null,
-                e.getStackTraceString(),
-                null
-            );
-            WhatsAppErrorLogger.logAgentforceError(
-                'Agent runtime invocation failed', conversationId, e
-            );
+            // Use System.debug to avoid DML before WhatsApp API callout
+            System.debug('AGENTFORCE_RUNTIME_EXCEPTION: ' + e.getMessage() + '\n' + e.getStackTraceString());
             return getFallbackResponse(userInput);
         }
     }
 
     /**
-     * @description Create a new Agentforce session
+     * @description Create a new Agentforce session via the Agent API.
+     *              POST https://api.salesforce.com/einstein/ai-agent/v1/agents/{agentId}/sessions
      */
-    private static String createAgentSession(String baseUrl, String apiVersion, String agentId) {
+    private static String createAgentSession(String agentId, Id conversationId) {
         try {
-            String endpoint = baseUrl + '/services/data/' + apiVersion +
-                             '/einstein/agents/' + agentId + '/sessions';
+            String endpoint = AGENT_API_BASE + '/agents/' + agentId + '/sessions';
+            String instanceUrl = URL.getOrgDomainUrl().toExternalForm();
+
+            Map<String, Object> requestBody = new Map<String, Object>{
+                'externalSessionKey' => generateSessionKey(),
+                'instanceConfig' => new Map<String, Object>{
+                    'endpoint' => instanceUrl
+                },
+                'bypassUser' => true
+            };
 
             HttpRequest req = new HttpRequest();
             req.setEndpoint(endpoint);
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionId());
-            req.setBody('{}');
+            req.setHeader('Authorization', 'Bearer ' + WhatsAppAuthService.getAgentforceAccessToken());
+            req.setBody(JSON.serialize(requestBody));
             req.setTimeout(WhatsAppConstants.DEFAULT_TIMEOUT);
 
             Http http = new Http();
@@ -255,33 +282,64 @@ public with sharing class WhatsAppAgentforceService {
 
             if (res.getStatusCode() == 200 || res.getStatusCode() == 201) {
                 Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-                return (String) responseMap.get('sessionId');
+                String newSessionId = (String) responseMap.get('sessionId');
+
+                // Save for deferred DML after all callouts complete
+                pendingSessionId = newSessionId;
+
+                // Use System.debug to avoid DML between callouts (session create → message send)
+                System.debug('AGENTFORCE_SESSION_CREATED: agentId=' + agentId + ', sessionId=' + newSessionId);
+                return newSessionId;
             }
+
+            // Error path — no more callouts expected after this, safe to use DML logging
+            System.debug('AGENTFORCE_SESSION_CREATION_HTTP_ERROR: HTTP ' + res.getStatusCode() + ' for agentId=' + agentId);
         } catch (Exception e) {
-            System.debug('Failed to create agent session: ' + e.getMessage());
+            System.debug('AGENTFORCE_SESSION_CREATION_EXCEPTION: ' + e.getMessage());
         }
         return null;
     }
 
     /**
-     * @description Parse the response from Agentforce Runtime API
+     * @description Generate a unique session key for agent sessions
+     */
+    private static String generateSessionKey() {
+        Blob b = Crypto.generateAesKey(128);
+        String hex = EncodingUtil.convertToHex(b);
+        return hex.substring(0,8) + '-' + hex.substring(8,12) + '-' +
+               hex.substring(12,16) + '-' + hex.substring(16,20) + '-' +
+               hex.substring(20,32);
+    }
+
+    /**
+     * @description Get next sequence ID for agent messages
+     */
+    private static Integer getNextSequenceId(Id conversationId) {
+        sequenceCounter++;
+        return sequenceCounter;
+    }
+
+    /**
+     * @description Parse the response from Agentforce Agent API.
+     *              The Agent API returns messages with type 'Inform' and a 'message' field.
      */
     private static String parseAgentResponse(String responseBody) {
         try {
             Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(responseBody);
 
-            // Extract the agent's text response
             List<Object> messages = (List<Object>) responseMap.get('messages');
             if (messages != null && !messages.isEmpty()) {
                 List<String> responseParts = new List<String>();
                 for (Object msgObj : messages) {
                     Map<String, Object> msg = (Map<String, Object>) msgObj;
-                    String role = (String) msg.get('role');
-                    if (role == 'Agent') {
-                        String text = (String) msg.get('text');
-                        if (String.isNotBlank(text)) {
-                            responseParts.add(text);
-                        }
+                    // Agent API uses 'message' field (not 'text') and 'type' like 'Inform'
+                    String text = (String) msg.get('message');
+                    if (String.isBlank(text)) {
+                        // Fallback to 'text' field for compatibility
+                        text = (String) msg.get('text');
+                    }
+                    if (String.isNotBlank(text)) {
+                        responseParts.add(text);
                     }
                 }
                 if (!responseParts.isEmpty()) {
@@ -351,10 +409,11 @@ public with sharing class WhatsAppAgentforceService {
      */
     private static String buildConversationContext(Id conversationId) {
         List<WhatsApp_Message__c> messages = [
-            SELECT Content__c, Direction__c, Message_Type__c, Timestamp__c
+            SELECT Content__c, Direction__c, Message_Type__c, Timestamp__c,
+                   Latitude__c, Longitude__c, Location_Name__c, Location_Address__c
             FROM WhatsApp_Message__c
             WHERE Conversation__c = :conversationId
-            AND Message_Type__c = 'Text'
+            AND Message_Type__c IN ('Text', 'Location', 'Interactive')
             ORDER BY Timestamp__c DESC
             LIMIT 20
         ];
@@ -363,7 +422,13 @@ public with sharing class WhatsAppAgentforceService {
         for (Integer i = messages.size() - 1; i >= 0; i--) {
             WhatsApp_Message__c msg = messages[i];
             String role = msg.Direction__c == WhatsAppConstants.DIRECTION_INBOUND ? 'Customer' : 'Agent';
-            contextLines.add(role + ': ' + msg.Content__c);
+            String content = msg.Content__c;
+            if (msg.Message_Type__c == 'Location') {
+                content = buildUserInput(msg);
+            } else if (msg.Message_Type__c == 'Interactive') {
+                content = 'User selected: ' + msg.Content__c;
+            }
+            contextLines.add(role + ': ' + content);
         }
 
         return String.join(contextLines, '\n');
@@ -378,7 +443,17 @@ public with sharing class WhatsAppAgentforceService {
         } else if (message.Message_Type__c == 'Interactive') {
             return 'User selected: ' + message.Content__c;
         } else if (message.Message_Type__c == 'Location') {
-            return 'User shared location: ' + message.Content__c;
+            String locationInfo = 'User shared location:';
+            if (message.Latitude__c != null && message.Longitude__c != null) {
+                locationInfo += ' Latitude=' + message.Latitude__c + ', Longitude=' + message.Longitude__c;
+            }
+            if (String.isNotBlank(message.Location_Name__c)) {
+                locationInfo += ', Name=' + message.Location_Name__c;
+            }
+            if (String.isNotBlank(message.Location_Address__c)) {
+                locationInfo += ', Address=' + message.Location_Address__c;
+            }
+            return locationInfo;
         }
         return message.Content__c;
     }
@@ -397,13 +472,17 @@ public with sharing class WhatsAppAgentforceService {
      */
     private static String getFallbackResponse(String userInput) {
         String lower = userInput.toLowerCase();
-        if (lower.contains('hello') || lower.contains('hi') || lower.contains('hey')) {
+        if (lower.contains('hello') || lower.contains('hi') || lower.contains('hey') ||
+            lower.contains('ola') || lower.contains('oi') || lower.contains('bom dia') ||
+            lower.contains('hola') || lower.contains('buenas')) {
             return 'Hello! Welcome to our support. How can I help you today?';
-        } else if (lower.contains('help')) {
+        } else if (lower.contains('help') || lower.contains('ajuda') || lower.contains('ayuda')) {
             return 'I\'m here to help! Please describe what you need assistance with.';
-        } else if (lower.contains('thank')) {
+        } else if (lower.contains('thank') || lower.contains('obrigado') || lower.contains('obrigada') ||
+                   lower.contains('gracias')) {
             return 'You\'re welcome! Is there anything else I can help you with?';
-        } else if (lower.contains('bye') || lower.contains('goodbye')) {
+        } else if (lower.contains('bye') || lower.contains('goodbye') || lower.contains('tchau') ||
+                   lower.contains('adeus') || lower.contains('adios')) {
             return 'Goodbye! Feel free to reach out anytime.';
         }
         return 'Thank you for your message. Let me look into that for you. Could you provide more details?';

@@ -2,7 +2,6 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Related_Message__c</fullName>
     <deleteConstraint>SetNull</deleteConstraint>
-    <externalId>false</externalId>
     <label>Related Message</label>
     <referenceTo>WhatsApp_Message__c</referenceTo>
     <relationshipLabel>WhatsApp Logs</relationshipLabel>

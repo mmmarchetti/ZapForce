@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiFunction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Analyzes the most recent image shared by a customer in a WhatsApp conversation using AI vision. Returns a detailed description of the image contents, or status information if the image is still being downloaded.</description>
+    <invocationTarget>WhatsAppAnalyzeImageAction</invocationTarget>
+    <invocationTargetType>apex</invocationTargetType>
+    <isConfirmationRequired>false</isConfirmationRequired>
+    <masterLabel>Analyze WhatsApp Image</masterLabel>
+</GenAiFunction>

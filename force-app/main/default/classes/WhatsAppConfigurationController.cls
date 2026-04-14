@@ -160,5 +160,4 @@ public with sharing class WhatsAppConfigurationController {
             throw new AuraHandledException('Error getting webhook URL: ' + e.getMessage());
         }
     }
-
 }
