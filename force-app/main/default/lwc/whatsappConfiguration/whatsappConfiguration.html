@@ -215,6 +215,16 @@
                                     onchange={handleInputChange}
                                 ></lightning-input>
                             </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Audio Transcription Flow API Name"
+                                    type="text"
+                                    value={config.Audio_Transcription_Flow_API_Name__c}
+                                    data-field="Audio_Transcription_Flow_API_Name__c"
+                                    onchange={handleInputChange}
+                                    placeholder="e.g. WhatsApp_Audio_Transcription"
+                                ></lightning-input>
+                            </div>
                             <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
                                 <lightning-input
                                     label="Session Timeout (Minutes)"

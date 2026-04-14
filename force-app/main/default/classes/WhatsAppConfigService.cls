@@ -32,9 +32,12 @@ public inherited sharing class WhatsAppConfigService {
                    Display_Phone_Number__c,
                    WhatsApp_API_Version__c,
                    Agentforce_Agent_Id__c,
+                   Audio_Transcription_Flow_API_Name__c,
                    Session_Timeout_Minutes__c,
                    HMAC_Validation_Enabled__c,
-                   Auto_Download_Media__c
+                   Auto_Download_Media__c,
+                   SF_Client_Id__c,
+                   SF_Client_Secret__c
             FROM WhatsApp_Configuration__c
             WHERE Is_Active__c = true
             LIMIT 1
@@ -132,6 +135,15 @@ public inherited sharing class WhatsAppConfigService {
         return config.Auto_Download_Media__c != null
             ? config.Auto_Download_Media__c
             : true;
+    }
+
+    /**
+     * @description Returns the API name of the autolaunched Flow used for audio transcription.
+     * @return Flow API name, or null/blank if not configured
+     */
+    public static String getAudioTranscriptionFlowApiName() {
+        WhatsApp_Configuration__c config = getActiveConfiguration();
+        return config.Audio_Transcription_Flow_API_Name__c;
     }
 
     /**

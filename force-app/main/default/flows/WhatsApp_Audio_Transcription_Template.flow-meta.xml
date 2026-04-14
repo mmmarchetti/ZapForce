@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <assignments>
+        <name>Set_Template_Transcription</name>
+        <label>Set Template Transcription</label>
+        <locationX>176</locationX>
+        <locationY>287</locationY>
+        <assignmentItems>
+            <assignToReference>transcription</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>TODO: Replace this assignment with your transcription logic.</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <interviewLabel>WhatsApp Audio Transcription Template {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>WhatsApp Audio Transcription Template</label>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Set_Template_Transcription</targetReference>
+        </connector>
+    </start>
+    <status>Draft</status>
+    <variables>
+        <name>contentDocumentId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>transcription</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

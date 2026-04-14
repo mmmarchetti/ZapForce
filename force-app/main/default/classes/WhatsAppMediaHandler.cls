@@ -70,6 +70,7 @@ public with sharing class WhatsAppMediaHandler {
             String fileName = String.isNotBlank(media.File_Name__c)
                 ? media.File_Name__c
                 : 'media_' + media.Media_ID__c;
+            fileName = ensureFileExtension(fileName, media.MIME_Type__c);
 
             // Store as Salesforce ContentVersion
             ContentVersion cv = new ContentVersion();
@@ -100,6 +101,10 @@ public with sharing class WhatsAppMediaHandler {
             media.File_Size__c = fileContent.size();
             media.Download_Status__c = WhatsAppConstants.DOWNLOAD_COMPLETED;
             update media;
+
+            if (String.valueOf(media.Media_Type__c).toLowerCase() == 'audio') {
+                processAudioTranscription(media, cv.Id, cv.ContentDocumentId);
+            }
             WhatsAppLogService.logInfo(
                 'MEDIA_DOWNLOAD_COMPLETED',
                 'WhatsAppMediaHandler.downloadAndStoreMedia',
@@ -326,6 +331,104 @@ public with sharing class WhatsAppMediaHandler {
             return WhatsAppConstants.MEDIA_STICKER;
         } else {
             return WhatsAppConstants.MEDIA_DOCUMENT;
+        }
+    }
+
+    private static String ensureFileExtension(String fileName, String mimeType) {
+        if (String.isBlank(fileName)) {
+            fileName = 'media_file';
+        }
+        if (fileName.contains('.')) {
+            return fileName;
+        }
+
+        String ext = getExtensionFromMimeType(mimeType);
+        if (String.isBlank(ext)) {
+            return fileName;
+        }
+        return fileName + '.' + ext;
+    }
+
+    private static String getExtensionFromMimeType(String mimeType) {
+        if (String.isBlank(mimeType)) {
+            return null;
+        }
+        String normalized = mimeType.toLowerCase().trim();
+        Integer semicolonIndex = normalized.indexOf(';');
+        if (semicolonIndex > -1) {
+            normalized = normalized.substring(0, semicolonIndex).trim();
+        }
+        Map<String, String> mimeToExt = new Map<String, String>{
+            'audio/ogg' => 'ogg',
+            'audio/mpeg' => 'mp3',
+            'audio/mp3' => 'mp3',
+            'audio/mp4' => 'm4a',
+            'audio/x-m4a' => 'm4a',
+            'audio/wav' => 'wav',
+            'audio/x-wav' => 'wav',
+            'audio/amr' => 'amr',
+            'audio/webm' => 'webm',
+            'audio/flac' => 'flac',
+            'audio/x-flac' => 'flac',
+            'video/mp4' => 'mp4',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'application/pdf' => 'pdf'
+        };
+        return mimeToExt.containsKey(normalized) ? mimeToExt.get(normalized) : null;
+    }
+
+    private static void processAudioTranscription(WhatsApp_Media__c media, Id contentVersionId, Id contentDocumentId) {
+        try {
+            WhatsApp_Message__c sourceMessage = [
+                SELECT Id, Conversation__c, Sender_Phone__c, Recipient_Phone__c
+                FROM WhatsApp_Message__c
+                WHERE Id = :media.Message__c
+                LIMIT 1
+            ];
+
+            String transcription = WhatsAppAudioTranscriptionService.transcribeAudio(contentDocumentId);
+
+            if (String.isBlank(transcription)) {
+                WhatsAppLogService.logWarn(
+                    'AUDIO_TRANSCRIPTION_EMPTY',
+                    'WhatsAppMediaHandler.processAudioTranscription',
+                    'Transcription flow returned empty text. mediaRecordId=' + media.Id,
+                    null
+                );
+                return;
+            }
+
+            WhatsApp_Message__c transcriptMessage = WhatsAppMessageService.createInboundTranscriptionMessage(
+                sourceMessage.Conversation__c,
+                sourceMessage.Sender_Phone__c,
+                sourceMessage.Recipient_Phone__c,
+                transcription,
+                media.Media_ID__c
+            );
+            WhatsAppConversationService.updateConversationOnMessage(sourceMessage.Conversation__c, true);
+
+            if (!Test.isRunningTest()) {
+                String jobId = System.enqueueJob(
+                    new WhatsAppAgentforceQueueable(sourceMessage.Conversation__c, transcriptMessage.Id)
+                );
+                WhatsAppLogService.logInfo(
+                    'AUDIO_TRANSCRIPTION_ROUTED_TO_AGENTFORCE',
+                    'WhatsAppMediaHandler.processAudioTranscription',
+                    'Transcription message created and routed. transcriptMessageId=' + transcriptMessage.Id +
+                    ', queueableJobId=' + jobId
+                );
+            }
+        } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'AUDIO_TRANSCRIPTION_PIPELINE_FAILED',
+                'WhatsAppMediaHandler.processAudioTranscription',
+                'Audio transcription pipeline failed: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
         }
     }
 }

@@ -106,6 +106,37 @@ public with sharing class WhatsAppMessageService {
     }
 
     /**
+     * @description Creates an inbound text message from an audio transcription.
+     * @param conversationId The related conversation record Id
+     * @param senderPhone The customer phone number
+     * @param recipientPhone The business phone number
+     * @param transcriptionText The transcribed text returned by Flow
+     * @param sourceMediaId The source media id for traceability
+     * @return The inserted WhatsApp_Message__c record
+     */
+    public static WhatsApp_Message__c createInboundTranscriptionMessage(
+        Id conversationId,
+        String senderPhone,
+        String recipientPhone,
+        String transcriptionText,
+        String sourceMediaId
+    ) {
+        WhatsApp_Message__c msg = new WhatsApp_Message__c();
+        msg.Conversation__c = conversationId;
+        msg.Sender_Phone__c = senderPhone;
+        msg.Recipient_Phone__c = recipientPhone;
+        msg.Direction__c = WhatsAppConstants.DIRECTION_INBOUND;
+        msg.Message_Status__c = WhatsAppConstants.STATUS_RECEIVED;
+        msg.Message_Type__c = WhatsAppConstants.TYPE_TEXT;
+        msg.Content__c = transcriptionText;
+        msg.Timestamp__c = Datetime.now();
+        msg.Message_ID__c = 'transcription_' + sourceMediaId + '_' + String.valueOf(Datetime.now().getTime());
+
+        insert msg;
+        return msg;
+    }
+
+    /**
      * @description Creates an outbound WhatsApp_Message__c record.
      * @param conversationId The related conversation record Id
      * @param recipientPhone The recipient phone number

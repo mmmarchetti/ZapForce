@@ -24,12 +24,16 @@ public with sharing class WhatsAppConfigurationController {
             result.put('Business_Account_ID__c', config.Business_Account_ID__c);
             result.put('WhatsApp_API_Version__c', config.WhatsApp_API_Version__c);
             result.put('Agentforce_Agent_Id__c', config.Agentforce_Agent_Id__c);
+            result.put('Audio_Transcription_Flow_API_Name__c', config.Audio_Transcription_Flow_API_Name__c);
             result.put('Session_Timeout_Minutes__c', config.Session_Timeout_Minutes__c);
             result.put('HMAC_Validation_Enabled__c', config.HMAC_Validation_Enabled__c);
             result.put('Auto_Download_Media__c', config.Auto_Download_Media__c);
             result.put('Is_Active__c', config.Is_Active__c);
+            result.put('SF_Client_Id__c', config.SF_Client_Id__c);
+            result.put('SF_Client_Secret__c', config.SF_Client_Secret__c);
             result.put('hasApiKey', String.isNotBlank(config.API_Key__c));
             result.put('hasWebhookToken', String.isNotBlank(config.Webhook_Verify_Token__c));
+            result.put('hasSFClientSecret', String.isNotBlank(config.SF_Client_Secret__c));
             return result;
         } catch (WhatsAppConfigService.WhatsAppConfigException e) {
             // No config exists yet
@@ -60,6 +64,8 @@ public with sharing class WhatsAppConfigurationController {
             config.Business_Account_ID__c = (String) configData.get('Business_Account_ID__c');
             config.WhatsApp_API_Version__c = (String) configData.get('WhatsApp_API_Version__c');
             config.Agentforce_Agent_Id__c = (String) configData.get('Agentforce_Agent_Id__c');
+            config.Audio_Transcription_Flow_API_Name__c =
+                (String) configData.get('Audio_Transcription_Flow_API_Name__c');
             config.Is_Active__c = true;
 
             // Handle numeric fields
@@ -81,6 +87,14 @@ public with sharing class WhatsAppConfigurationController {
             String webhookToken = (String) configData.get('Webhook_Verify_Token__c');
             if (String.isNotBlank(webhookToken) && webhookToken != MASK) {
                 config.Webhook_Verify_Token__c = webhookToken;
+            }
+
+            // SF Connected App credentials for Agentforce auth
+            config.SF_Client_Id__c = (String) configData.get('SF_Client_Id__c');
+
+            String sfClientSecret = (String) configData.get('SF_Client_Secret__c');
+            if (String.isNotBlank(sfClientSecret) && sfClientSecret != MASK) {
+                config.SF_Client_Secret__c = sfClientSecret;
             }
 
             // Deactivate other configs
@@ -146,4 +160,5 @@ public with sharing class WhatsAppConfigurationController {
             throw new AuraHandledException('Error getting webhook URL: ' + e.getMessage());
         }
     }
+
 }

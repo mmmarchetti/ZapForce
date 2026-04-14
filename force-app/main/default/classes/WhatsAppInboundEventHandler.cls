@@ -32,6 +32,19 @@ public with sharing class WhatsAppInboundEventHandler {
             evt.Customer_Phone__c, businessPhone, customerName
         );
 
+        WhatsAppLogService.log(
+            'INFO',
+            'PARSED_MESSAGE_OBJECT',
+            'WhatsAppInboundEventHandler.processEvent',
+            'Parsed inbound message object generated successfully.',
+            evt.Payload_JSON__c,
+            JSON.serialize(parsed),
+            null,
+            null,
+            conv.Id,
+            null
+        );
+
         // Create message record
         WhatsApp_Message__c msg = WhatsAppMessageService.createInboundMessage(
             parsed, conv.Id, businessPhone
@@ -192,14 +205,30 @@ public with sharing class WhatsAppInboundEventHandler {
         WhatsAppWebhookParser.MediaContent media = getMediaContent(parsed);
         if (media == null || String.isBlank(media.id)) return;
 
-        String capitalizedType = parsed.type.substring(0, 1).toUpperCase() + parsed.type.substring(1).toLowerCase();
-        WhatsApp_Media__c mediaRecord = WhatsAppMediaHandler.createMediaRecord(
-            msg.Id, media.id, capitalizedType, media.mimeType, media.filename, media.caption, media.sha256
+        WhatsAppLogService.log(
+            'INFO',
+            'PARSED_MEDIA_OBJECT',
+            'WhatsAppInboundEventHandler.handleMediaCreation',
+            'Parsed media object detected for inbound message.',
+            JSON.serialize(parsed),
+            JSON.serialize(media),
+            null,
+            null,
+            msg.Conversation__c,
+            msg.Id
         );
+
+
+        WhatsApp_Media__c mediaRecord = WhatsAppMediaHandler.createMediaRecord(
+            msg.Id, media.id, parsed.type, media.mimeType, media.filename, media.caption, media.sha256
+        );
+
+        
+        
         WhatsAppLogService.logInfo(
             'MEDIA_RECORD_CREATED',
             'WhatsAppInboundEventHandler.handleMediaCreation',
-            'Created media record for type=' + capitalizedType +
+            'Created media record for type=' + parsed.type +
             ', mediaId=' + media.id +
             ', messageId=' + msg.Id +
             ', mediaRecordId=' + mediaRecord.Id
