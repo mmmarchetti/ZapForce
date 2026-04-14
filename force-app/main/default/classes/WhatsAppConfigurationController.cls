@@ -28,8 +28,11 @@ public with sharing class WhatsAppConfigurationController {
             result.put('HMAC_Validation_Enabled__c', config.HMAC_Validation_Enabled__c);
             result.put('Auto_Download_Media__c', config.Auto_Download_Media__c);
             result.put('Is_Active__c', config.Is_Active__c);
+            result.put('SF_Client_Id__c', config.SF_Client_Id__c);
+            result.put('SF_Client_Secret__c', config.SF_Client_Secret__c);
             result.put('hasApiKey', String.isNotBlank(config.API_Key__c));
             result.put('hasWebhookToken', String.isNotBlank(config.Webhook_Verify_Token__c));
+            result.put('hasSFClientSecret', String.isNotBlank(config.SF_Client_Secret__c));
             return result;
         } catch (WhatsAppConfigService.WhatsAppConfigException e) {
             // No config exists yet
@@ -81,6 +84,14 @@ public with sharing class WhatsAppConfigurationController {
             String webhookToken = (String) configData.get('Webhook_Verify_Token__c');
             if (String.isNotBlank(webhookToken) && webhookToken != MASK) {
                 config.Webhook_Verify_Token__c = webhookToken;
+            }
+
+            // SF Connected App credentials for Agentforce auth
+            config.SF_Client_Id__c = (String) configData.get('SF_Client_Id__c');
+
+            String sfClientSecret = (String) configData.get('SF_Client_Secret__c');
+            if (String.isNotBlank(sfClientSecret) && sfClientSecret != MASK) {
+                config.SF_Client_Secret__c = sfClientSecret;
             }
 
             // Deactivate other configs

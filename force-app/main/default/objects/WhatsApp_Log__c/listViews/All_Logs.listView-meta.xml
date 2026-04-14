@@ -7,6 +7,13 @@
     <columns>Source__c</columns>
     <columns>Status_Code__c</columns>
     <columns>CREATED_DATE</columns>
+    <columns>Request_Payload__c</columns>
+    <columns>Response_Payload__c</columns>
+    <columns>Stack_Trace__c</columns>
+    <columns>Related_Conversation__c</columns>
+    <columns>Related_Message__c</columns>
+    <columns>Details__c</columns>
+    <columns>CREATEDBY_USER</columns>
     <filterScope>Everything</filterScope>
     <label>All Logs</label>
 </ListView>

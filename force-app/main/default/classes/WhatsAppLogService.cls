@@ -10,7 +10,8 @@ public with sharing class WhatsAppLogService {
     public static void logWarn(String action, String source, String details, Integer statusCode) {
         log('WARN', action, source, details, null, null, null, statusCode, null, null);
     }
- 
+
+
     public static void logError(
         String action,
         String source,

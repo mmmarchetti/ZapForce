@@ -34,7 +34,9 @@ public inherited sharing class WhatsAppConfigService {
                    Agentforce_Agent_Id__c,
                    Session_Timeout_Minutes__c,
                    HMAC_Validation_Enabled__c,
-                   Auto_Download_Media__c
+                   Auto_Download_Media__c,
+                   SF_Client_Id__c,
+                   SF_Client_Secret__c
             FROM WhatsApp_Configuration__c
             WHERE Is_Active__c = true
             LIMIT 1

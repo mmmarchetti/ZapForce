@@ -46,7 +46,9 @@ public with sharing class WhatsAppInboundEventHandler {
         }
 
         // Route to Agentforce (via another Queueable to allow callout)
-        if (!Test.isRunningTest()) {
+        // For Image messages, defer Agentforce processing until media download completes
+        // (WhatsAppMediaDownloadQueueable chains the Agentforce queueable after download)
+        if (!Test.isRunningTest() && !isImageMessage(parsed.type)) {
             String jobId = System.enqueueJob(new WhatsAppAgentforceQueueable(conv.Id, msg.Id));
             WhatsAppLogService.logInfo(
                 'AGENTFORCE_QUEUEABLE_ENQUEUED',
@@ -186,6 +188,10 @@ public with sharing class WhatsAppInboundEventHandler {
                messageType == WhatsAppConstants.TYPE_AUDIO ||
                messageType == WhatsAppConstants.TYPE_DOCUMENT ||
                messageType == WhatsAppConstants.TYPE_STICKER;
+    }
+
+    private static Boolean isImageMessage(String messageType) {
+        return messageType == WhatsAppConstants.TYPE_IMAGE;
     }
 
     private static void handleMediaCreation(WhatsApp_Message__c msg, WhatsAppWebhookParser.ParsedMessage parsed) {
