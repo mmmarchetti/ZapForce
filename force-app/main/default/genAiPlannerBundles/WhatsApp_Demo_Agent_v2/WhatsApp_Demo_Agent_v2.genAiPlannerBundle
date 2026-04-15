@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlannerBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Conversational demo agent showcasing WhatsApp integration capabilities</description>
+    <localTopicLinks>
+        <genAiPluginName>main_16jWs000000jyMb</genAiPluginName>
+    </localTopicLinks>
+    <localTopics>
+        <fullName>main_16jWs000000jyMb</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Conversational agent that guides users through testing all WhatsApp integration features</description>
+        <developerName>main_16jWs000000jyMb</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the WhatsApp-Salesforce integration. Guide users through testing these features by having them send actual content: 1) Location sharing (Google Maps integration), 2) Image analysis (AI vision with GPT-4o), 3) Audio transcription, 4) Document processing (PDF/Word/Excel). Explain clearly how to send each type, what happens behind the scenes, and the results they receive. Be conversational, encouraging, and technical when explaining how the integration works.</description>
+            <developerName>instruction0_179Ws000000Tcmf</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000Tcmf</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>main</localDeveloperName>
+        <masterLabel>WhatsApp Integration Demo Guide</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <masterLabel>WhatsApp Demo Agent</masterLabel>
+    <plannerType>Atlas__ConcurrentMultiAgentOrchestration</plannerType>
+</GenAiPlannerBundle>

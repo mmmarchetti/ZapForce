@@ -4,7 +4,6 @@
  *              Replaces duplicate getActiveConfiguration() methods across the codebase.
  */
 public inherited sharing class WhatsAppConfigService {
-
     private static WhatsApp_Configuration__c cachedConfig;
 
     /**
@@ -19,27 +18,30 @@ public inherited sharing class WhatsAppConfigService {
         }
 
         List<WhatsApp_Configuration__c> configs = [
-            SELECT Id,
-                   Name,
-                   API_Key__c,
-                   Phone_Number__c,
-                   API_Base_URL__c,
-                   Webhook_URL__c,
-                   Webhook_Verify_Token__c,
-                   Business_Account_ID__c,
-                   Is_Active__c,
-                   Phone_Number_ID__c,
-                   Display_Phone_Number__c,
-                   WhatsApp_API_Version__c,
-                   Agentforce_Agent_Id__c,
-                   Audio_Transcription_Flow_API_Name__c,
-                   Session_Timeout_Minutes__c,
-                   HMAC_Validation_Enabled__c,
-                   Auto_Download_Media__c,
-                   SF_Client_Id__c,
-                   SF_Client_Secret__c
+            SELECT
+                Id,
+                Name,
+                API_Key__c,
+                Phone_Number__c,
+                API_Base_URL__c,
+                Webhook_URL__c,
+                Webhook_Verify_Token__c,
+                Business_Account_ID__c,
+                Is_Active__c,
+                Phone_Number_ID__c,
+                Display_Phone_Number__c,
+                WhatsApp_API_Version__c,
+                Agentforce_Agent_Id__c,
+                Audio_Transcription_Flow_API_Name__c,
+                Image_Analysis_Flow_API_Name__c,
+                File_Processing_Flow_API_Name__c,
+                Session_Timeout_Minutes__c,
+                HMAC_Validation_Enabled__c,
+                Auto_Download_Media__c,
+                SF_Client_Id__c,
+                SF_Client_Secret__c
             FROM WhatsApp_Configuration__c
-            WHERE Is_Active__c = true
+            WHERE Is_Active__c = TRUE
             LIMIT 1
         ];
 
@@ -79,7 +81,12 @@ public inherited sharing class WhatsAppConfigService {
      */
     public static String getMessagesEndpoint() {
         WhatsApp_Configuration__c config = getActiveConfiguration();
-        return config.API_Base_URL__c + '/' + getApiVersion() + '/' + config.Phone_Number_ID__c + WhatsAppConstants.PATH_MESSAGES;
+        return config.API_Base_URL__c +
+            '/' +
+            getApiVersion() +
+            '/' +
+            config.Phone_Number_ID__c +
+            WhatsAppConstants.PATH_MESSAGES;
     }
 
     /**
@@ -88,7 +95,12 @@ public inherited sharing class WhatsAppConfigService {
      */
     public static String getMediaEndpoint() {
         WhatsApp_Configuration__c config = getActiveConfiguration();
-        return config.API_Base_URL__c + '/' + getApiVersion() + '/' + config.Phone_Number_ID__c + WhatsAppConstants.PATH_MEDIA;
+        return config.API_Base_URL__c +
+            '/' +
+            getApiVersion() +
+            '/' +
+            config.Phone_Number_ID__c +
+            WhatsAppConstants.PATH_MEDIA;
     }
 
     /**
@@ -108,9 +120,7 @@ public inherited sharing class WhatsAppConfigService {
      */
     public static Integer getSessionTimeoutMinutes() {
         WhatsApp_Configuration__c config = getActiveConfiguration();
-        return config.Session_Timeout_Minutes__c != null
-            ? Integer.valueOf(config.Session_Timeout_Minutes__c)
-            : 1440;
+        return config.Session_Timeout_Minutes__c != null ? Integer.valueOf(config.Session_Timeout_Minutes__c) : 1440;
     }
 
     /**
@@ -120,9 +130,7 @@ public inherited sharing class WhatsAppConfigService {
      */
     public static Boolean isHmacValidationEnabled() {
         WhatsApp_Configuration__c config = getActiveConfiguration();
-        return config.HMAC_Validation_Enabled__c != null
-            ? config.HMAC_Validation_Enabled__c
-            : true;
+        return config.HMAC_Validation_Enabled__c != null ? config.HMAC_Validation_Enabled__c : true;
     }
 
     /**
@@ -132,9 +140,7 @@ public inherited sharing class WhatsAppConfigService {
      */
     public static Boolean isAutoDownloadMediaEnabled() {
         WhatsApp_Configuration__c config = getActiveConfiguration();
-        return config.Auto_Download_Media__c != null
-            ? config.Auto_Download_Media__c
-            : true;
+        return config.Auto_Download_Media__c != null ? config.Auto_Download_Media__c : true;
     }
 
     /**
@@ -147,7 +153,26 @@ public inherited sharing class WhatsAppConfigService {
     }
 
     /**
+     * @description Returns the API name of the autolaunched Flow used for image analysis.
+     * @return Flow API name, or null/blank if not configured
+     */
+    public static String getImageAnalysisFlowApiName() {
+        WhatsApp_Configuration__c config = getActiveConfiguration();
+        return config.Image_Analysis_Flow_API_Name__c;
+    }
+
+    /**
+     * @description Returns the API name of the autolaunched Flow used for file processing.
+     * @return Flow API name, or null/blank if not configured
+     */
+    public static String getFileProcessingFlowApiName() {
+        WhatsApp_Configuration__c config = getActiveConfiguration();
+        return config.File_Processing_Flow_API_Name__c;
+    }
+
+    /**
      * @description Custom exception for WhatsApp configuration errors.
      */
-    public class WhatsAppConfigException extends Exception {}
+    public class WhatsAppConfigException extends Exception {
+    }
 }

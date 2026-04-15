@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AIAuthoringBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <description>Comprehensive demo agent showcasing all WhatsApp integration capabilities including text, location sharing, image analysis, interactive messages, templates, media, and escalation.</description>
+    <label>WhatsApp Demo Agent</label>
+    <type>AgentforceServiceAgent</type>
+</AIAuthoringBundle>

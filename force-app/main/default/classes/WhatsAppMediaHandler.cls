@@ -6,7 +6,6 @@
  *              invocation from Queueable, Batch, or Platform Event triggers.
  */
 public with sharing class WhatsAppMediaHandler {
-
     /**
      * @description Creates a WhatsApp_Media__c record with Download_Status = Pending.
      * @param messageId  The parent WhatsApp_Message__c record Id
@@ -51,8 +50,7 @@ public with sharing class WhatsAppMediaHandler {
         WhatsApp_Media__c media;
         try {
             media = [
-                SELECT Id, Media_ID__c, Media_Type__c, File_Name__c,
-                       MIME_Type__c, Download_Status__c, Message__c
+                SELECT Id, Media_ID__c, Media_Type__c, File_Name__c, MIME_Type__c, Download_Status__c, Message__c
                 FROM WhatsApp_Media__c
                 WHERE Id = :mediaRecordId
                 LIMIT 1
@@ -67,9 +65,7 @@ public with sharing class WhatsAppMediaHandler {
             Blob fileContent = WhatsAppAPIService.downloadMedia(media.Media_ID__c);
 
             // Determine file name
-            String fileName = String.isNotBlank(media.File_Name__c)
-                ? media.File_Name__c
-                : 'media_' + media.Media_ID__c;
+            String fileName = String.isNotBlank(media.File_Name__c) ? media.File_Name__c : 'media_' + media.Media_ID__c;
             fileName = ensureFileExtension(fileName, media.MIME_Type__c);
 
             // Store as Salesforce ContentVersion
@@ -102,17 +98,22 @@ public with sharing class WhatsAppMediaHandler {
             media.Download_Status__c = WhatsAppConstants.DOWNLOAD_COMPLETED;
             update media;
 
-            if (String.valueOf(media.Media_Type__c).toLowerCase() == 'audio') {
+            String mediaTypeLower = String.valueOf(media.Media_Type__c).toLowerCase();
+            if (mediaTypeLower == 'audio') {
                 processAudioTranscription(media, cv.Id, cv.ContentDocumentId);
+            } else if (mediaTypeLower == 'document') {
+                processFileContent(media, cv.Id, cv.ContentDocumentId);
             }
             WhatsAppLogService.logInfo(
                 'MEDIA_DOWNLOAD_COMPLETED',
                 'WhatsAppMediaHandler.downloadAndStoreMedia',
-                'Downloaded and stored media successfully. mediaRecordId=' + mediaRecordId +
-                ', mediaId=' + media.Media_ID__c +
-                ', contentVersionId=' + cv.Id
+                'Downloaded and stored media successfully. mediaRecordId=' +
+                    mediaRecordId +
+                    ', mediaId=' +
+                    media.Media_ID__c +
+                    ', contentVersionId=' +
+                    cv.Id
             );
-
         } catch (Exception e) {
             // Mark as failed and log the error
             if (mediaRecordId != null) {
@@ -170,20 +171,35 @@ public with sharing class WhatsAppMediaHandler {
             String boundary = '----FormBoundary' + String.valueOf(DateTime.now().getTime());
 
             // Part 1: messaging_product field
-            String productPart = '--' + boundary + '\r\n'
-                + 'Content-Disposition: form-data; name="messaging_product"\r\n\r\n'
-                + WhatsAppConstants.MESSAGE_PRODUCT + '\r\n';
+            String productPart =
+                '--' +
+                boundary +
+                '\r\n' +
+                'Content-Disposition: form-data; name="messaging_product"\r\n\r\n' +
+                WhatsAppConstants.MESSAGE_PRODUCT +
+                '\r\n';
 
             // Part 2: type field
             String mediaType = determineMediaType(cv.FileType);
-            String typePart = '--' + boundary + '\r\n'
-                + 'Content-Disposition: form-data; name="type"\r\n\r\n'
-                + mimeType + '\r\n';
+            String typePart =
+                '--' +
+                boundary +
+                '\r\n' +
+                'Content-Disposition: form-data; name="type"\r\n\r\n' +
+                mimeType +
+                '\r\n';
 
             // Part 3: file data header
-            String fileHeader = '--' + boundary + '\r\n'
-                + 'Content-Disposition: form-data; name="file"; filename="' + fileName + '"\r\n'
-                + 'Content-Type: ' + mimeType + '\r\n\r\n';
+            String fileHeader =
+                '--' +
+                boundary +
+                '\r\n' +
+                'Content-Disposition: form-data; name="file"; filename="' +
+                fileName +
+                '"\r\n' +
+                'Content-Type: ' +
+                mimeType +
+                '\r\n\r\n';
 
             // Part 4: closing boundary
             String fileFooter = '\r\n--' + boundary + '--';
@@ -264,40 +280,40 @@ public with sharing class WhatsAppMediaHandler {
 
         Map<String, String> mimeTypes = new Map<String, String>{
             // Images
-            'jpg'  => 'image/jpeg',
+            'jpg' => 'image/jpeg',
             'jpeg' => 'image/jpeg',
-            'png'  => 'image/png',
-            'gif'  => 'image/gif',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
             'webp' => 'image/webp',
-            'bmp'  => 'image/bmp',
-            'svg'  => 'image/svg+xml',
+            'bmp' => 'image/bmp',
+            'svg' => 'image/svg+xml',
             // Video
-            'mp4'  => 'video/mp4',
-            'avi'  => 'video/x-msvideo',
-            '3gp'  => 'video/3gpp',
-            'mkv'  => 'video/x-matroska',
-            'mov'  => 'video/quicktime',
+            'mp4' => 'video/mp4',
+            'avi' => 'video/x-msvideo',
+            '3gp' => 'video/3gpp',
+            'mkv' => 'video/x-matroska',
+            'mov' => 'video/quicktime',
             // Audio
-            'mp3'  => 'audio/mpeg',
-            'ogg'  => 'audio/ogg',
-            'amr'  => 'audio/amr',
+            'mp3' => 'audio/mpeg',
+            'ogg' => 'audio/ogg',
+            'amr' => 'audio/amr',
             'opus' => 'audio/opus',
-            'aac'  => 'audio/aac',
-            'wav'  => 'audio/wav',
-            'm4a'  => 'audio/mp4',
+            'aac' => 'audio/aac',
+            'wav' => 'audio/wav',
+            'm4a' => 'audio/mp4',
             // Documents
-            'pdf'  => 'application/pdf',
-            'doc'  => 'application/msword',
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls'  => 'application/vnd.ms-excel',
+            'xls' => 'application/vnd.ms-excel',
             'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'ppt'  => 'application/vnd.ms-powerpoint',
+            'ppt' => 'application/vnd.ms-powerpoint',
             'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'txt'  => 'text/plain',
-            'csv'  => 'text/csv',
-            'zip'  => 'application/zip',
+            'txt' => 'text/plain',
+            'csv' => 'text/csv',
+            'zip' => 'application/zip',
             'json' => 'application/json',
-            'xml'  => 'application/xml'
+            'xml' => 'application/xml'
         };
 
         String key = fileType.toLowerCase();
@@ -415,8 +431,10 @@ public with sharing class WhatsAppMediaHandler {
                 WhatsAppLogService.logInfo(
                     'AUDIO_TRANSCRIPTION_ROUTED_TO_AGENTFORCE',
                     'WhatsAppMediaHandler.processAudioTranscription',
-                    'Transcription message created and routed. transcriptMessageId=' + transcriptMessage.Id +
-                    ', queueableJobId=' + jobId
+                    'Transcription message created and routed. transcriptMessageId=' +
+                        transcriptMessage.Id +
+                        ', queueableJobId=' +
+                        jobId
                 );
             }
         } catch (Exception e) {
@@ -424,6 +442,65 @@ public with sharing class WhatsAppMediaHandler {
                 'AUDIO_TRANSCRIPTION_PIPELINE_FAILED',
                 'WhatsAppMediaHandler.processAudioTranscription',
                 'Audio transcription pipeline failed: ' + e.getMessage(),
+                null,
+                null,
+                e.getStackTraceString(),
+                null
+            );
+        }
+    }
+
+    private static void processFileContent(WhatsApp_Media__c media, Id contentVersionId, Id contentDocumentId) {
+        try {
+            WhatsApp_Message__c sourceMessage = [
+                SELECT Id, Conversation__c, Sender_Phone__c, Recipient_Phone__c
+                FROM WhatsApp_Message__c
+                WHERE Id = :media.Message__c
+                LIMIT 1
+            ];
+
+            String fileContent = WhatsAppMediaFlowService.processMedia(
+                contentDocumentId,
+                WhatsAppMediaFlowService.forFile()
+            );
+
+            if (String.isBlank(fileContent)) {
+                WhatsAppLogService.logWarn(
+                    'FILE_PROCESSING_EMPTY',
+                    'WhatsAppMediaHandler.processFileContent',
+                    'File processing flow returned empty text. mediaRecordId=' + media.Id,
+                    null
+                );
+                return;
+            }
+
+            WhatsApp_Message__c contentMessage = WhatsAppMessageService.createInboundTranscriptionMessage(
+                sourceMessage.Conversation__c,
+                sourceMessage.Sender_Phone__c,
+                sourceMessage.Recipient_Phone__c,
+                fileContent,
+                media.Media_ID__c
+            );
+            WhatsAppConversationService.updateConversationOnMessage(sourceMessage.Conversation__c, true);
+
+            if (!Test.isRunningTest()) {
+                String jobId = System.enqueueJob(
+                    new WhatsAppAgentforceQueueable(sourceMessage.Conversation__c, contentMessage.Id)
+                );
+                WhatsAppLogService.logInfo(
+                    'FILE_PROCESSING_ROUTED_TO_AGENTFORCE',
+                    'WhatsAppMediaHandler.processFileContent',
+                    'File content message created and routed. contentMessageId=' +
+                        contentMessage.Id +
+                        ', queueableJobId=' +
+                        jobId
+                );
+            }
+        } catch (Exception e) {
+            WhatsAppLogService.logError(
+                'FILE_PROCESSING_PIPELINE_FAILED',
+                'WhatsAppMediaHandler.processFileContent',
+                'File processing pipeline failed: ' + e.getMessage(),
                 null,
                 null,
                 e.getStackTraceString(),

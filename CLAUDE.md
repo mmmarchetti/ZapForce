@@ -11,10 +11,11 @@ WhatsApp Salesforce Integration - A comprehensive application that connects What
 ### Data Model (7 Custom Objects + 2 Platform Events)
 
 **WhatsApp_Configuration__c** - API credentials and settings
-- API Key, Phone Number, Webhook URL, Business Account ID, Phone Number ID, Display Phone Number, API Version, Agentforce Agent Id, Session Timeout, HMAC Validation toggle, Auto Download Media toggle
+- API Key, Phone Number, Webhook URL, Business Account ID, Phone Number ID, Display Phone Number, API Version, Agentforce Agent Id, Audio Transcription Flow API Name, Image Analysis Flow API Name, File Processing Flow API Name, Session Timeout, HMAC Validation toggle, Auto Download Media toggle
 
 **WhatsApp_Conversation__c** - Conversation tracking
-- Customer Phone, Status, Customer Name, Session Start/Expiry, Agentforce Session Id/Topic, Contact lookup, Case lookup, Lead lookup, Escalated To User, Conversation Origin, Unread Count, Message Count, Last Message Time
+- Customer Phone, Status, Customer Name, Session Start/Expiry, Agentforce Session Id/Agent Id/Topic, Contact lookup, Case lookup, Lead lookup, Escalated To User, Conversation Origin, Unread Count, Message Count, Last Message Time
+- `Agentforce_Agent_Id__c` tracks which agent owns the session - used to detect agent changes and invalidate stale sessions
 
 **WhatsApp_Message__c** - All WhatsApp message types (text, image, video, audio, document, location, contact, sticker, interactive, template, reaction, contacts, system)
 - Message ID, Sender/Recipient Phone, Direction, Status, Type, Content, Timestamp, Latitude/Longitude, Location Name/Address, Context Message ID, Is Forwarded, Reaction Emoji, Interactive Type/Button, Template Name, Sticker Animated, Contact Card JSON, Error Code/Message, Is From Agentforce, Raw Payload JSON
@@ -76,11 +77,27 @@ Note: Only WhatsApp-related classes are kept in the local project. The org conta
 - `WhatsAppMarkReadAction` - Mark message as read
 - `WhatsAppEscalateAction` - Escalate to human agent
 
+**Media Processing (Generic Pattern):**
+- `WhatsAppMediaFlowService` - Generic service for invoking Flow-based media processing (audio, image, document files). Uses configuration wrapper pattern (`MediaFlowConfig`) to handle media-specific settings (Flow API name, output key, log prefixes). Eliminates code duplication between media types.
+- `WhatsAppAudioTranscriptionService` - Thin wrapper for audio transcription, delegates to `WhatsAppMediaFlowService.processMedia()` with audio configuration
+- `WhatsAppImageAnalysisFlowService` - Thin wrapper for image analysis, delegates to `WhatsAppMediaFlowService.processMedia()` with image configuration
+- **Adding New Media Types**: To support new media types, add a config getter to `WhatsAppConfigService`, add a static factory method to `MediaFlowConfig` (e.g., `forVideo()`), and create a 3-line wrapper service. No duplicate logic needed.
+
+**Audio Transcription:**
+- Invokes configured Flow (specified in `Audio_Transcription_Flow_API_Name__c`) to process audio files
+- Flow receives `contentDocumentId` parameter and returns `transcription` text output
+- Result is created as inbound message and routed to Agentforce
+
 **Image Analysis:**
-- `WhatsAppImageAnalysisService` - Calls ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate() with GPT-4o multimodal vision via the `WhatsApp_Image_Analysis` Prompt Template. Passes ContentDocument reference (not raw binary). Uses 0 HTTP callouts (internal pathway). **CRITICAL: ConnectApi requires a licensed user context — fails when called from Automated Process user.**
-- `WhatsAppImageAnalysisEndpoint` - `@RestResource(urlMapping='/whatsapp/image-analysis')` loopback endpoint. Called by `WhatsAppImageAnalysisQueueable` with a JWT token so the ConnectApi call executes as the Connected App's Run-As user (a licensed user), not the Automated Process user.
-- `WhatsAppImageAnalysisQueueable` - Triggered by `WhatsAppMediaTrigger` when image download completes. Uses loopback HTTP callout to `WhatsAppImageAnalysisEndpoint` for the ConnectApi call, then sends the result to WhatsApp. Implements `Database.AllowsCallouts`. **DML-before-callout prevention**: all logging/DML happens AFTER both callouts (loopback + WhatsApp send).
+- `WhatsAppImageAnalysisQueueable` - Triggered by `WhatsAppMediaTrigger` when image download completes. Calls `WhatsAppImageAnalysisFlowService` to analyze the image, creates an inbound message with the analysis result, and routes it to Agentforce. Implements `Database.AllowsCallouts`.
 - `WhatsAppAnalyzeImageAction` - InvocableMethod for Agentforce agents to analyze images on-demand
+- **Template Flow**: `WhatsApp_Image_Analysis_Template` - Example autolaunched Flow that uses the `WhatsApp_Image_Analysis` GenAi Prompt Template with GPT-4o multimodal vision. Admins can customize this Flow or create their own implementation.
+
+**File Processing (PDF, Word, Excel, etc.):**
+- Triggered by `WhatsAppMediaHandler` when document download completes. Calls configured Flow (specified in `File_Processing_Flow_API_Name__c`) to analyze file and provide context.
+- Flow receives `contentDocumentId` parameter and returns `content` text output (document analysis summary)
+- Result is created as inbound message and routed to Agentforce, providing the agent with document context
+- **Template Flow**: `WhatsApp_File_Processing_Template` - Example autolaunched Flow that uses the `WhatsApp_File_Processing` GenAi Prompt Template with GPT-4o to generate a structured document analysis. Admins can customize this Flow or create their own implementation.
 
 **Queueables:**
 - `WhatsAppSendMessageQueueable` - Async HTTP send
@@ -92,7 +109,7 @@ Note: Only WhatsApp-related classes are kept in the local project. The org conta
 - `WhatsAppTemplateController` - Template management
 
 **Platform Event Handlers:**
-- `WhatsAppInboundEventHandler` - Processes inbound events: parses message from payload JSON, creates conversation/message records, handles media creation, enqueues Agentforce processing. **Image messages skip Agentforce** — image analysis is handled by the `WhatsAppMediaTrigger` → `WhatsAppImageAnalysisQueueable` pipeline after download completes.
+- `WhatsAppInboundEventHandler` - Processes inbound events: parses message from payload JSON, creates conversation/message records, handles media creation, enqueues Agentforce processing. **Image and document messages skip Agentforce** — processing is handled by `WhatsAppMediaHandler` after download completes.
 - Trigger: `WhatsAppInboundEventTrigger`
 - Trigger: `WhatsAppMediaTrigger` - Fires on `WhatsApp_Media__c` after update. When `ContentVersion_ID__c` is newly populated for an Image, enqueues `WhatsAppImageAnalysisQueueable`. Follows ZeladoriaApp trigger pattern.
 
@@ -210,6 +227,31 @@ sf data import tree --plan data/plan.json
 
 ## Important Patterns and Conventions
 
+### Adding New Media Types
+
+To add support for new media types (e.g., video transcription, document OCR):
+1. Add config field to `WhatsApp_Configuration__c` (e.g., `Video_Transcription_Flow_API_Name__c`)
+2. Add config getter to `WhatsAppConfigService` (e.g., `getVideoTranscriptionFlowApiName()`)
+3. Add static factory method to `WhatsAppMediaFlowService.MediaFlowConfig`:
+   ```apex
+   public static MediaFlowConfig forVideo() {
+       MediaFlowConfig config = new MediaFlowConfig();
+       config.flowApiName = WhatsAppConfigService.getVideoTranscriptionFlowApiName();
+       config.outputKey = 'transcription'; // or 'caption', 'summary', etc.
+       config.logPrefix = 'VIDEO_TRANSCRIPTION';
+       return config;
+   }
+   ```
+4. Create thin wrapper service (optional, 3 lines):
+   ```apex
+   public static String transcribeVideo(Id contentDocumentId) {
+       return WhatsAppMediaFlowService.processMedia(
+           contentDocumentId, MediaFlowConfig.forVideo()
+       );
+   }
+   ```
+5. No duplicate Flow invocation logic needed - reuses generic `processMedia()` method
+
 ### Apex Patterns
 - Use `@AuraEnabled` for methods exposed to LWC
 - Use `@InvocableMethod` for Agentforce actions
@@ -220,13 +262,11 @@ sf data import tree --plan data/plan.json
 - Use `WhatsAppConfigService` for cached configuration access (`inherited sharing` — inherits caller's sharing context)
 - `WhatsAppWebhookHandler` uses `without sharing` — required for Guest User access via public Site
 - Avoid DML before callouts in Agentforce processing (use `getContactIdForRouting` pattern)
-- **ConnectApi requires licensed user context**: `ConnectApi.EinsteinLLM` fails when called from the Automated Process user (Platform Event triggers, Queueables chained from them). Use a **loopback callout** pattern: `@RestResource` endpoint + JWT token from Connected App to run ConnectApi as the Run-As user.
-- **Loopback callout pattern**: When async code runs as Automated Process but needs a licensed user context, call a REST endpoint on the same org using a JWT token from `WhatsAppAuthService.getAgentforceAccessToken()`. The endpoint executes as the Connected App's Run-As user. Example: `WhatsAppImageAnalysisQueueable` → `WhatsAppImageAnalysisEndpoint`.
 - **GenAiPromptTemplate deployment**: Metadata deploy creates the template but runtime activation must be done manually via the Prompt Builder UI. Without activation, ConnectApi returns empty generations (no error). Use model `sfdc_ai__DefaultGPT4Omni` (not deprecated `sfdc_ai__DefaultOpenAIGPT4`).
+- **Flow-based pattern for AI features**: Use autolaunched Flows configured in WhatsApp_Configuration__c for extensible AI features (audio transcription, image analysis). Admins can customize logic without code changes.
 
 ### Remote Site Settings
 - https://graph.facebook.com (WhatsApp Business API)
-- https://storm-13a4609358aeb6.my.salesforce.com (loopback callouts for image analysis endpoint)
 
 ### Webhook Handling
 - Webhook class: `WhatsAppWebhookHandler` (`@RestResource`, `without sharing`)
@@ -246,6 +286,8 @@ sf data import tree --plan data/plan.json
 - Upload to WhatsApp uses multipart/form-data with hex-encoding for binary fidelity (`WhatsAppMediaHandler.uploadMediaToWhatsApp`)
 - Comprehensive MIME type mapping (images, video, audio, documents, stickers)
 - **Image analysis trigger**: `WhatsAppMediaTrigger` fires on `WhatsApp_Media__c` after update when `ContentVersion_ID__c` is populated for images, enqueuing `WhatsAppImageAnalysisQueueable`
+- **Audio transcription**: `WhatsAppMediaHandler.downloadAndStoreMedia()` detects audio files and calls `processAudioTranscription()`, which uses the configured Flow to transcribe, creates an inbound message, and routes to Agentforce
+- **Document processing**: `WhatsAppMediaHandler.downloadAndStoreMedia()` detects document files and calls `processFileContent()`, which uses the configured Flow to extract/interpret content, creates an inbound message, and routes to Agentforce
 
 ### Agentforce Integration
 - Platform Events (`WhatsApp_Inbound_Event__e`, `WhatsApp_Outbound_Event__e`) for real-time message routing
@@ -260,22 +302,25 @@ sf data import tree --plan data/plan.json
   - Run As user must be set via UI (Setup → App Manager → Manage → Edit Policies → Client Credentials Flow)
 - **DML-before-callout prevention**: All logging between callouts uses `System.debug` instead of `WhatsAppLogService`. Session ID saved to conversation after all callouts complete via `pendingSessionId` pattern.
 - `WhatsAppAgentforceQueueable` for async callouts from Platform Event trigger context
-- Processes text, interactive, and location messages; image messages are handled separately by `WhatsAppImageAnalysisQueueable`; other media messages get silent acknowledgment
+- Processes text, interactive, and location messages; image and document messages are handled by media-specific pipelines after download; other media types (video, sticker) get silent acknowledgment
 - Location messages pass full field data to Agentforce via `buildUserInput()`
 - Fallback responses when Agentforce is unavailable or unconfigured
 - 24-hour conversation window management
-- Session tracking with Agentforce Session Id on conversations
+- Session tracking with Agentforce Session Id and Agent Id on conversations
+- Automatic session invalidation when Agentforce Agent ID changes in configuration
 - 10 InvocableMethod actions exposed as GenAiFunctions (9 original + WhatsAppAnalyzeImageAction)
 - Three published agents: WhatsApp_Customer_Service_Agent (main), WhatsApp_Geolocation_Agent (location test), WhatsApp_Image_Analysis_Agent (image analysis)
 - Agent Script authoring bundles in `aiAuthoringBundles/` — validate with `sf agent validate authoring-bundle`, publish with `sf agent publish authoring-bundle --skip-retrieve`
 
 ### Image Analysis Pipeline
-- **Architecture**: Trigger-based pipeline following ZeladoriaApp pattern (decoupled from Agentforce flow)
-- **Flow**: Image arrives → download queued (Agentforce skipped) → download completes → `WhatsApp_Media__c` updated → `WhatsAppMediaTrigger` fires → `WhatsAppImageAnalysisQueueable` enqueued → loopback HTTP to `WhatsAppImageAnalysisEndpoint` (JWT-authenticated, runs as licensed user) → ConnectApi Prompt Template with GPT-4o vision → result sent to WhatsApp
+- **Architecture**: Flow-based configuration pattern (matches audio transcription pattern exactly)
+- **Flow**: Image arrives → download queued (Agentforce skipped) → download completes → `WhatsApp_Media__c` updated → `WhatsAppMediaTrigger` fires → `WhatsAppImageAnalysisQueueable` enqueued → invokes configured autolaunched Flow via `WhatsAppImageAnalysisFlowService` → Flow processes image and returns analysis text → creates inbound message with analysis → routes to Agentforce → Agentforce responds to customer
+- **Configuration**: Admin sets `Image_Analysis_Flow_API_Name__c` in WhatsApp_Configuration__c (e.g., `WhatsApp_Image_Analysis_Template`)
+- **Template Flow**: `WhatsApp_Image_Analysis_Template` - Example Flow using `WhatsApp_Image_Analysis` GenAiPromptTemplate with GPT-4o vision via `sfdc_ai__EinsteinGPTGenerateContent` action. Admins can customize or replace with their own implementation.
+- **Flow Contract**: Input variable `contentDocumentId` (Text), Output variable `analysis` (Text)
 - **Prompt Template**: `WhatsApp_Image_Analysis` (GenAiPromptTemplate, type `einstein_gpt__flex`, model `sfdc_ai__DefaultGPT4Omni`). Input: `SOBJECT://ContentDocument` reference. Must be activated via Prompt Builder UI after metadata deploy.
-- **ConnectApi pattern**: `ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate()` with `Map<String, String>{ 'id' => contentDocumentId, 'type' => 'ContentDocument' }` wrapped in `ConnectApi.WrappedValue`, key `Input:Image`, `applicationName = 'PromptBuilderPreview'`
-- **ConnectApi limitation**: Requires a licensed user context. Fails silently (returns empty generations or throws exception) when called from the Automated Process user. Solution: loopback callout via `@RestResource` endpoint authenticated with JWT token from Connected App (runs as Run-As user).
-- **DML-before-callout**: The Queueable makes two sequential callouts (loopback analysis + WhatsApp send). All DML (logging, message creation) must happen AFTER both callouts. Use `System.debug` for interim logging.
+- **Agentforce Integration**: Analysis result is created as an inbound message (using `createInboundTranscriptionMessage`) and routed to Agentforce via `WhatsAppAgentforceQueueable`. Agentforce processes the analysis and responds to the customer.
+- **Error Handling**: If Flow returns empty/null, logs error and stops processing (no message sent)
 - **Race condition prevention**: Image messages skip immediate Agentforce routing in `WhatsAppInboundEventHandler`. Analysis only triggers after download completes (via trigger on `ContentVersion_ID__c` population).
 
 ### Security
@@ -300,7 +345,8 @@ sf data import tree --plan data/plan.json
 | `force-app/main/default/genAiFunctions/` | 10 GenAiFunction definitions (8 original + WhatsAppGetLocationInfoAction + WhatsAppAnalyzeImageAction) |
 | `force-app/main/default/genAiPlugins/` | 4 GenAiPlugin (Topic) definitions |
 | `force-app/main/default/genAiPlanners/` | 1 GenAiPlanner definition |
-| `force-app/main/default/genAiPromptTemplates/` | 1 GenAiPromptTemplate (WhatsApp_Image_Analysis — multimodal vision with GPT-4o) |
+| `force-app/main/default/genAiPromptTemplates/` | 2 GenAiPromptTemplates (WhatsApp_Image_Analysis — multimodal vision, WhatsApp_File_Processing — document extraction) |
+| `force-app/main/default/flows/` | Template Flows (WhatsApp_Image_Analysis_Template, WhatsApp_File_Processing_Template) |
 | `force-app/main/default/aiAuthoringBundles/` | Agent Script bundles (WhatsApp_Geolocation_Agent, WhatsApp_Image_Analysis_Agent) |
 | `scripts/apex/` | Setup scripts: fix-fls.apex, configure-guest-profile.apex, configure-guest-object-perms.apex, configure-guest-fls.apex, test-image-agent-e2e.apex |
 
@@ -359,11 +405,11 @@ After deploying to a new org:
 - `updateMessageStatus` scans recent 2000 records and matches in Apex as a workaround
 
 ### Image analysis not working
-- **ConnectApi returns empty/fails silently**: Prompt Template must be activated via Prompt Builder UI (Setup → Einstein → Prompt Builder). Metadata deploy alone is not enough.
-- **"You have uncommitted work pending"**: DML-before-callout error. Ensure no `WhatsAppLogService` calls between the loopback callout and the WhatsApp send callout in `WhatsAppImageAnalysisQueueable`. Use `System.debug` between callouts.
-- **ConnectApi fails in Queueable context**: ConnectApi.EinsteinLLM requires a licensed user. Queueables from Platform Event triggers run as Automated Process user. Use the loopback callout pattern via `WhatsAppImageAnalysisEndpoint`.
+- **Flow not configured**: Ensure `Image_Analysis_Flow_API_Name__c` is set in WhatsApp_Configuration__c (e.g., `WhatsApp_Image_Analysis_Template`)
+- **Flow execution fails**: Check `WhatsApp_Log__c` for action codes: `IMAGE_ANALYSIS_FLOW_NOT_CONFIGURED`, `IMAGE_ANALYSIS_FLOW_FAILED`, `IMAGE_ANALYSIS_FLOW_EMPTY_OUTPUT`, `IMAGE_ANALYSIS_FLOW_MISSING_ANALYSIS_KEY`
+- **Prompt Template not activated**: If using the template Flow, activate the `WhatsApp_Image_Analysis` Prompt Template via Prompt Builder UI (Setup → Einstein → Prompt Builder). Metadata deploy alone is not enough.
 - **Race condition (image still downloading)**: Image messages must NOT be sent to Agentforce immediately. The `WhatsAppMediaTrigger` ensures analysis only happens after download completes.
-- **Model deprecated**: Use `sfdc_ai__DefaultGPT4Omni`, not `sfdc_ai__DefaultOpenAIGPT4`
+- **Model deprecated**: Use `sfdc_ai__DefaultGPT4Omni`, not `sfdc_ai__DefaultOpenAIGPT4` in custom Flows
 
 ### Field-Level Security issues
 - Run `sf apex run --file scripts/apex/fix-fls.apex` to fix FLS after deployment

@@ -50,6 +50,16 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>WhatsApp_Configuration__c.Image_Analysis_Flow_API_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>WhatsApp_Configuration__c.File_Processing_Flow_API_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>WhatsApp_Configuration__c.Session_Timeout_Minutes__c</field>
         <readable>true</readable>
     </fieldPermissions>

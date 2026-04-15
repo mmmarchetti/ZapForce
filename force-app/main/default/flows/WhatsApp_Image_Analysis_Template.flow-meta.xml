@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <description>Template Flow for WhatsApp image analysis. Customize this Flow to implement your own analysis logic. Input: contentDocumentId (Text), Output: analysis (Text). Add a GenAi Prompt Template action to process the image.</description>
+    <interviewLabel>WhatsApp Image Analysis Template {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>WhatsApp Image Analysis Template</label>
+    <processType>AutoLaunchedFlow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+    </start>
+    <status>Draft</status>
+    <variables>
+        <name>contentDocumentId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>analysis</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+</Flow>

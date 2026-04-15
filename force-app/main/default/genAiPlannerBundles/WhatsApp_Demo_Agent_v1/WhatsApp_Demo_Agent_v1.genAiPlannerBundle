@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPlannerBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Conversational demo agent showcasing WhatsApp integration capabilities</description>
+    <localTopicLinks>
+        <genAiPluginName>audio_demo_16jWs000000jyJN</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>document_demo_16jWs000000jyJN</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>image_demo_16jWs000000jyJN</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>location_demo_16jWs000000jyJN</genAiPluginName>
+    </localTopicLinks>
+    <localTopicLinks>
+        <genAiPluginName>topic_selector_16jWs000000jyJN</genAiPluginName>
+    </localTopicLinks>
+    <localTopics>
+        <fullName>image_demo_16jWs000000jyJN</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Guides user through testing AI-powered image analysis</description>
+        <developerName>image_demo_16jWs000000jyJN</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the full capabilities of this WhatsApp-Salesforce integration. You demonstrate how location sharing, image analysis, audio transcription, and document processing work automatically. Be friendly, clear, and guide customers through testing each feature by having them send the actual content via WhatsApp.</description>
+            <developerName>instruction0_179Ws000000TcjV</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000TcjV</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>image_demo</localDeveloperName>
+        <masterLabel>Image Analysis Demo</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>topic_selector_16jWs000000jyJN</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Guides users through testing WhatsApp integration features</description>
+        <developerName>topic_selector_16jWs000000jyJN</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the full capabilities of this WhatsApp-Salesforce integration. You demonstrate how location sharing, image analysis, audio transcription, and document processing work automatically. Be friendly, clear, and guide customers through testing each feature by having them send the actual content via WhatsApp.</description>
+            <developerName>instruction0_179Ws000000TcjU</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000TcjU</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>topic_selector</localDeveloperName>
+        <masterLabel>Demo Guide</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>audio_demo_16jWs000000jyJN</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Guides user through testing audio transcription</description>
+        <developerName>audio_demo_16jWs000000jyJN</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the full capabilities of this WhatsApp-Salesforce integration. You demonstrate how location sharing, image analysis, audio transcription, and document processing work automatically. Be friendly, clear, and guide customers through testing each feature by having them send the actual content via WhatsApp.</description>
+            <developerName>instruction0_179Ws000000TcjT</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000TcjT</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>audio_demo</localDeveloperName>
+        <masterLabel>Audio Transcription Demo</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>document_demo_16jWs000000jyJN</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Guides user through testing document analysis</description>
+        <developerName>document_demo_16jWs000000jyJN</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the full capabilities of this WhatsApp-Salesforce integration. You demonstrate how location sharing, image analysis, audio transcription, and document processing work automatically. Be friendly, clear, and guide customers through testing each feature by having them send the actual content via WhatsApp.</description>
+            <developerName>instruction0_179Ws000000TcjS</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000TcjS</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>document_demo</localDeveloperName>
+        <masterLabel>Document Processing Demo</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <localTopics>
+        <fullName>location_demo_16jWs000000jyJN</fullName>
+        <canEscalate>false</canEscalate>
+        <description>Guides user through testing location sharing with Google Maps integration</description>
+        <developerName>location_demo_16jWs000000jyJN</developerName>
+        <genAiPluginInstructions>
+            <description>You are a WhatsApp Demo Agent showcasing the full capabilities of this WhatsApp-Salesforce integration. You demonstrate how location sharing, image analysis, audio transcription, and document processing work automatically. Be friendly, clear, and guide customers through testing each feature by having them send the actual content via WhatsApp.</description>
+            <developerName>instruction0_179Ws000000TcjR</developerName>
+            <language>en_US</language>
+            <masterLabel>instruction0_179Ws000000TcjR</masterLabel>
+            <sortOrder>1</sortOrder>
+        </genAiPluginInstructions>
+        <language>en_US</language>
+        <localDeveloperName>location_demo</localDeveloperName>
+        <masterLabel>Location Sharing Demo</masterLabel>
+        <pluginType>Topic</pluginType>
+    </localTopics>
+    <masterLabel>WhatsApp Demo Agent</masterLabel>
+    <plannerType>Atlas__ConcurrentMultiAgentOrchestration</plannerType>
+</GenAiPlannerBundle>

@@ -225,6 +225,26 @@
                                     placeholder="e.g. WhatsApp_Audio_Transcription"
                                 ></lightning-input>
                             </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="Image Analysis Flow API Name"
+                                    type="text"
+                                    value={config.Image_Analysis_Flow_API_Name__c}
+                                    data-field="Image_Analysis_Flow_API_Name__c"
+                                    onchange={handleInputChange}
+                                    placeholder="e.g. WhatsApp_Image_Analysis_Template"
+                                ></lightning-input>
+                            </div>
+                            <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
+                                <lightning-input
+                                    label="File Processing Flow API Name"
+                                    type="text"
+                                    value={config.File_Processing_Flow_API_Name__c}
+                                    data-field="File_Processing_Flow_API_Name__c"
+                                    onchange={handleInputChange}
+                                    placeholder="e.g. WhatsApp_File_Processing_Template"
+                                ></lightning-input>
+                            </div>
                             <div class="slds-col slds-size_1-of-2 slds-m-bottom_small">
                                 <lightning-input
                                     label="Session Timeout (Minutes)"

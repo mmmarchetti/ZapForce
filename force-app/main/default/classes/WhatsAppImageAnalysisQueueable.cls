@@ -1,13 +1,10 @@
 /**
- * @description Queueable for analyzing WhatsApp images via a loopback callout.
- *              ConnectApi.EinsteinLLM requires a licensed user context — it fails
- *              under the Automated Process user. This queueable calls the
- *              WhatsAppImageAnalysisEndpoint REST API using a JWT token from the
- *              Connected App, which runs the ConnectApi call as the Run-As user.
- *              After analysis, chains WhatsAppSendMessageQueueable to deliver the result.
+ * @description Queueable for analyzing WhatsApp images via Flow-based configuration.
+ *              Invokes the configured autolaunched Flow (specified in Image_Analysis_Flow_API_Name__c)
+ *              to process the image. The Flow receives a contentDocumentId and returns analysis text.
+ *              Creates an inbound message with the analysis result and routes it to Agentforce.
  */
 public class WhatsAppImageAnalysisQueueable implements Queueable, Database.AllowsCallouts {
-
     private List<Id> mediaRecordIds;
 
     public WhatsAppImageAnalysisQueueable(List<Id> mediaRecordIds) {
@@ -16,13 +13,18 @@ public class WhatsAppImageAnalysisQueueable implements Queueable, Database.Allow
 
     public void execute(QueueableContext context) {
         List<WhatsApp_Media__c> mediaRecords = [
-            SELECT Id, ContentVersion_ID__c, Media_Type__c,
-                   Message__c, Message__r.Conversation__c,
-                   Message__r.Conversation__r.Customer_Phone__c
+            SELECT
+                Id,
+                ContentVersion_ID__c,
+                Media_Type__c,
+                Media_ID__c,
+                Message__c,
+                Message__r.Conversation__c,
+                Message__r.Conversation__r.Customer_Phone__c,
+                Message__r.Sender_Phone__c,
+                Message__r.Recipient_Phone__c
             FROM WhatsApp_Media__c
-            WHERE Id IN :mediaRecordIds
-              AND ContentVersion_ID__c != null
-              AND Media_Type__c = 'Image'
+            WHERE Id IN :mediaRecordIds AND ContentVersion_ID__c != NULL AND Media_Type__c = 'Image'
         ];
 
         if (mediaRecords.isEmpty()) {
@@ -35,15 +37,13 @@ public class WhatsAppImageAnalysisQueueable implements Queueable, Database.Allow
             cvIds.add(media.ContentVersion_ID__c);
         }
 
-        Map<Id, ContentVersion> cvMap = new Map<Id, ContentVersion>([
-            SELECT Id, ContentDocumentId
-            FROM ContentVersion
-            WHERE Id IN :cvIds
-        ]);
-
-        // Get auth token once for all images
-        String token = WhatsAppAuthService.getAgentforceAccessToken();
-        String orgDomain = URL.getOrgDomainUrl().toExternalForm();
+        Map<Id, ContentVersion> cvMap = new Map<Id, ContentVersion>(
+            [
+                SELECT Id, ContentDocumentId
+                FROM ContentVersion
+                WHERE Id IN :cvIds
+            ]
+        );
 
         for (WhatsApp_Media__c media : mediaRecords) {
             ContentVersion cv = cvMap.get(media.ContentVersion_ID__c);
@@ -55,90 +55,60 @@ public class WhatsAppImageAnalysisQueueable implements Queueable, Database.Allow
             String conversationId = media.Message__r.Conversation__c;
 
             try {
-                // Loopback callout to REST endpoint (runs as Connected App Run-As user)
-                String analysisResult = callImageAnalysisEndpoint(
-                    orgDomain, token, cv.ContentDocumentId
+                // Invoke Flow-based image analysis
+                String analysisResult = WhatsAppImageAnalysisFlowService.analyzeImage(cv.ContentDocumentId);
+
+                if (String.isBlank(analysisResult)) {
+                    WhatsAppLogService.logError(
+                        'IMAGE_ANALYSIS_EMPTY',
+                        'WhatsAppImageAnalysisQueueable.execute',
+                        'Analysis flow returned empty text. mediaRecordId=' + media.Id,
+                        null,
+                        null,
+                        null,
+                        null
+                    );
+                    return;
+                }
+
+                // Create inbound message with analysis result (similar to audio transcription)
+                WhatsApp_Message__c analysisMessage = WhatsAppMessageService.createInboundTranscriptionMessage(
+                    conversationId,
+                    media.Message__r.Sender_Phone__c,
+                    media.Message__r.Recipient_Phone__c,
+                    analysisResult,
+                    media.Media_ID__c
                 );
 
-                String messageText;
-                Boolean analysisSucceeded = String.isNotBlank(analysisResult) &&
-                                            !analysisResult.startsWith('Error: ');
-                if (analysisSucceeded) {
-                    messageText = analysisResult;
-                } else {
-                    messageText = 'Desculpe, não consegui analisar a imagem neste momento. ' +
-                                  'Por favor, tente enviar novamente.';
-                }
+                // Update conversation
+                WhatsAppConversationService.updateConversationOnMessage(conversationId, true);
 
-                // Use System.debug between callouts to avoid DML-before-callout
-                System.debug('IMAGE_ANALYSIS_RESULT: success=' + analysisSucceeded +
-                             ', mediaRecordId=' + media.Id);
-
-                // Send the result directly to WhatsApp (HTTP callout — no DML before this)
-                String waMessageId = WhatsAppAPIService.sendTextMessage(customerPhone, messageText);
-
-                // All callouts done — safe to do DML now
-                if (analysisSucceeded) {
+                // Route to Agentforce for processing
+                if (!Test.isRunningTest()) {
+                    String jobId = System.enqueueJob(
+                        new WhatsAppAgentforceQueueable(conversationId, analysisMessage.Id)
+                    );
                     WhatsAppLogService.logInfo(
-                        'IMAGE_ANALYSIS_COMPLETED',
+                        'IMAGE_ANALYSIS_ROUTED_TO_AGENTFORCE',
                         'WhatsAppImageAnalysisQueueable.execute',
-                        'Image analysis succeeded and sent. mediaRecordId=' + media.Id +
-                        ', conversationId=' + conversationId +
-                        ', resultLength=' + analysisResult.length()
-                    );
-                } else {
-                    WhatsAppLogService.logError(
-                        'IMAGE_ANALYSIS_ERROR',
-                        'WhatsAppImageAnalysisQueueable.execute',
-                        'Analysis failed. mediaRecordId=' + media.Id +
-                        ', contentDocumentId=' + cv.ContentDocumentId +
-                        ', result=' + analysisResult,
-                        null, null, null, null
+                        'Analysis message created and routed. analysisMessageId=' +
+                            analysisMessage.Id +
+                            ', queueableJobId=' +
+                            jobId
                     );
                 }
-
-                if (String.isNotBlank(waMessageId)) {
-                    WhatsApp_Configuration__c config = WhatsAppConfigService.getActiveConfiguration();
-                    WhatsAppMessageService.createOutboundMessage(
-                        conversationId, customerPhone, config.Phone_Number__c,
-                        'Text', messageText, waMessageId
-                    );
-                    WhatsAppConversationService.updateConversationOnMessage(conversationId, false);
-                }
-
             } catch (Exception e) {
                 System.debug('IMAGE_ANALYSIS_QUEUEABLE_EXCEPTION: ' + e.getMessage());
                 WhatsAppLogService.logError(
                     'IMAGE_ANALYSIS_QUEUEABLE_FAILED',
                     'WhatsAppImageAnalysisQueueable.execute',
                     'Image analysis failed: ' + e.getMessage(),
-                    null, null, e.getStackTraceString(), null
+                    null,
+                    null,
+                    e.getStackTraceString(),
+                    null
                 );
             }
-        }
-    }
-
-    private static String callImageAnalysisEndpoint(String orgDomain, String token, String contentDocumentId) {
-        String endpoint = orgDomain + '/services/apexrest/whatsapp/image-analysis';
-
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(endpoint);
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('Authorization', 'Bearer ' + token);
-        req.setBody(JSON.serialize(new Map<String, String>{
-            'contentDocumentId' => contentDocumentId
-        }));
-        req.setTimeout(120000);
-
-        Http http = new Http();
-        HttpResponse res = http.send(req);
-
-        if (res.getStatusCode() == 200) {
-            Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-            return (String) responseMap.get('result');
-        } else {
-            return 'Error: HTTP ' + res.getStatusCode() + ' - ' + res.getBody();
         }
     }
 }

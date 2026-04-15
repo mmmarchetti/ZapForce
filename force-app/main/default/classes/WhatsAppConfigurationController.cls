@@ -3,7 +3,6 @@
  *              Handles configuration CRUD, secret masking, and connection testing.
  */
 public with sharing class WhatsAppConfigurationController {
-
     private static final String MASK = '••••••••••••••••';
 
     @AuraEnabled
@@ -25,6 +24,8 @@ public with sharing class WhatsAppConfigurationController {
             result.put('WhatsApp_API_Version__c', config.WhatsApp_API_Version__c);
             result.put('Agentforce_Agent_Id__c', config.Agentforce_Agent_Id__c);
             result.put('Audio_Transcription_Flow_API_Name__c', config.Audio_Transcription_Flow_API_Name__c);
+            result.put('Image_Analysis_Flow_API_Name__c', config.Image_Analysis_Flow_API_Name__c);
+            result.put('File_Processing_Flow_API_Name__c', config.File_Processing_Flow_API_Name__c);
             result.put('Session_Timeout_Minutes__c', config.Session_Timeout_Minutes__c);
             result.put('HMAC_Validation_Enabled__c', config.HMAC_Validation_Enabled__c);
             result.put('Auto_Download_Media__c', config.Auto_Download_Media__c);
@@ -64,8 +65,11 @@ public with sharing class WhatsAppConfigurationController {
             config.Business_Account_ID__c = (String) configData.get('Business_Account_ID__c');
             config.WhatsApp_API_Version__c = (String) configData.get('WhatsApp_API_Version__c');
             config.Agentforce_Agent_Id__c = (String) configData.get('Agentforce_Agent_Id__c');
-            config.Audio_Transcription_Flow_API_Name__c =
-                (String) configData.get('Audio_Transcription_Flow_API_Name__c');
+            config.Audio_Transcription_Flow_API_Name__c = (String) configData.get(
+                'Audio_Transcription_Flow_API_Name__c'
+            );
+            config.Image_Analysis_Flow_API_Name__c = (String) configData.get('Image_Analysis_Flow_API_Name__c');
+            config.File_Processing_Flow_API_Name__c = (String) configData.get('File_Processing_Flow_API_Name__c');
             config.Is_Active__c = true;
 
             // Handle numeric fields
@@ -99,13 +103,15 @@ public with sharing class WhatsAppConfigurationController {
 
             // Deactivate other configs
             List<WhatsApp_Configuration__c> others = [
-                SELECT Id FROM WhatsApp_Configuration__c
-                WHERE Id != :config.Id AND Is_Active__c = true
+                SELECT Id
+                FROM WhatsApp_Configuration__c
+                WHERE Id != :config.Id AND Is_Active__c = TRUE
             ];
             for (WhatsApp_Configuration__c other : others) {
                 other.Is_Active__c = false;
             }
-            if (!others.isEmpty()) update others;
+            if (!others.isEmpty())
+                update others;
 
             upsert config;
             WhatsAppConfigService.clearCache();
@@ -122,11 +128,14 @@ public with sharing class WhatsAppConfigurationController {
         try {
             WhatsApp_Configuration__c config = [
                 SELECT Id, API_Key__c, Phone_Number_ID__c, API_Base_URL__c, WhatsApp_API_Version__c
-                FROM WhatsApp_Configuration__c WHERE Id = :configId LIMIT 1
+                FROM WhatsApp_Configuration__c
+                WHERE Id = :configId
+                LIMIT 1
             ];
 
             String apiVersion = String.isNotBlank(config.WhatsApp_API_Version__c)
-                ? config.WhatsApp_API_Version__c : WhatsAppConstants.API_VERSION;
+                ? config.WhatsApp_API_Version__c
+                : WhatsAppConstants.API_VERSION;
             String endpoint = config.API_Base_URL__c + '/' + apiVersion + '/' + config.Phone_Number_ID__c;
 
             HttpRequest req = new HttpRequest();
